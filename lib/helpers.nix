@@ -29,22 +29,50 @@ let
     , sha256 ? lib.fakeHash
     , postInstall ? ""
     }:
+    let
+      # GitHub uses /releases/latest/download/ for the latest release,
+      # not /releases/download/latest/ which returns 404.
+      versionPath = if version == "latest" then "latest/download" else "${version}/download";
+      isArchive = builtins.match ".*\\.(tar\\.(gz|bz2|xz)|tgz|zip)$" asset != null;
+    in
     pkgs.stdenv.mkDerivation {
       inherit pname version postInstall;
 
       src = pkgs.fetchurl {
-        url = "https://github.com/${owner}/${repo}/releases/download/${version}/${asset}";
+        url = "https://github.com/${owner}/${repo}/releases/${versionPath}/${asset}";
         inherit sha256;
       };
 
-      dontUnpack = true;
+      # Archives need unpacking; raw binaries don't.
+      dontUnpack = !isArchive;
       dontBuild = true;
 
       installPhase = ''
         runHook preInstall
         mkdir -p $out/bin
-        cp $src $out/bin/${pname}
-        chmod +x $out/bin/${pname}
+        ${if isArchive then ''
+          # Extract archive and find the binary
+          _tmpdir=$(mktemp -d)
+          cp $src "$_tmpdir/${asset}"
+          ${lib.optionalString (builtins.match ".*\\.zip$" asset != null) "unzip"}
+          tar xf "$_tmpdir/${asset}" -C "$_tmpdir" 2>/dev/null || unzip "$_tmpdir/${asset}" -d "$_tmpdir" 2>/dev/null || true
+          # Find the binary: either matches pname or is the only executable
+          _bin=$(find "$_tmpdir" -type f -name "${pname}" -o -type f -name "${pname}-*" 2>/dev/null | head -1)
+          if [[ -z "$_bin" ]]; then
+            _bin=$(find "$_tmpdir" -type f -executable 2>/dev/null | head -1)
+          fi
+          if [[ -n "$_bin" ]]; then
+            cp "$_bin" $out/bin/${pname}
+            chmod +x $out/bin/${pname}
+          else
+            echo "Warning: could not find ${pname} binary in archive" >&2
+            cp "$_tmpdir/${asset}" $out/bin/${pname}
+          fi
+          rm -rf "$_tmpdir"
+        '' else ''
+          cp $src $out/bin/${pname}
+          chmod +x $out/bin/${pname}
+        ''}
         runHook postInstall
       '';
 
@@ -71,28 +99,53 @@ let
     , sha256 ? lib.fakeHash
     , postInstall ? ""
     }:
-    pkgs.buildNpmPackage {
+    let
+      # For "latest", use the npm registry redirect endpoint which resolves
+      # to the most recent version's tarball. For pinned versions, construct
+      # the tarball URL directly.
+      tarballUrl =
+        if version == "latest"
+        then "https://registry.npmjs.org/${npmName}/-/${builtins.baseNameOf npmName}-latest.tgz"
+        else "https://registry.npmjs.org/${npmName}/-/${builtins.baseNameOf npmName}-${version}.tgz";
+    in
+    pkgs.stdenv.mkDerivation {
       inherit pname version postInstall;
 
-      npmDepsHash = sha256;
-
       src = pkgs.fetchurl {
-        url = "https://registry.npmjs.org/${npmName}/-/${builtins.baseNameOf npmName}-${version}.tgz";
+        url = tarballUrl;
         inherit sha256;
       };
 
-      dontNpmBuild = true;
+      nativeBuildInputs = [ pkgs.nodejs pkgs.npm-hook ];
+
+      dontUnpack = true;
+      dontBuild = true;
 
       installPhase = ''
         runHook preInstall
-        mkdir -p $out/bin $out/lib/node_modules
-        npm install --prefix $out/lib ${npmName}@${version} --ignore-scripts
-        # Link all bin entries
-        for bin in $out/lib/node_modules/${npmName}/bin/*; do
-          ln -sf "$bin" "$out/bin/$(basename "$bin")"
-        done
+        mkdir -p $out/lib/node_modules $out/bin
+        # Install from the fetched tarball
+        npm install -g --prefix $out "$src" --ignore-scripts 2>&1 || {
+          echo "Warning: npm install failed for ${pname}" >&2
+          exit 1
+        }
+        # Link all bin entries from the installed package
+        _pkgdir="$out/lib/node_modules/${npmName}"
+        if [[ -d "$_pkgdir/bin" ]]; then
+          for bin in "$_pkgdir"/bin/*; do
+            ln -sf "$bin" "$out/bin/$(basename "$bin")"
+          done
+        elif [[ -f "$_pkgdir/package.json" ]]; then
+          # Some packages declare bins in package.json
+          _bins=$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; Object.keys(b).forEach(k=>console.log(k))" 2>/dev/null || true)
+          for bin in $_bins; do
+            ln -sf "$_pkgdir/$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; console.log(typeof b==='string'?b:b['$bin'])" 2>/dev/null)" "$out/bin/$bin" 2>/dev/null || true
+          done
+        fi
         runHook postInstall
       '';
+
+      meta.mainProgram = pname;
     };
 
   # ---------------------------------------------------------------------------

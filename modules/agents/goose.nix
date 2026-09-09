@@ -26,9 +26,6 @@ in
         repo = "goose";
         asset = "goose-linux-amd64.tar.gz";
         sha256 = lib.fakeHash;
-        postInstall = ''
-          tar xzf $out/bin/goose 2>/dev/null || true
-        '';
       })
     ];
 

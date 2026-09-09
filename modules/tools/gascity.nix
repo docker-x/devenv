@@ -58,7 +58,7 @@ in
 
     processes.gascity-register = lib.mkIf cfg.autoRegister {
       exec = ''
-        gc register --auto 2>/dev/null || true
+        gc register --auto
       '';
       processManager = "hivemind";
     };

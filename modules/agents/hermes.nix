@@ -21,8 +21,14 @@ in
     enterShell = ''
       # dx.agents.hermes: install via upstream installer
       if ! command -v hermes &>/dev/null; then
-        echo "dx.agents.hermes: running upstream installer..."
-        curl --proto =https -fsSL https://hermes-agent.nousresearch.com/install.sh | bash || true
+        echo "dx.agents.hermes: downloading upstream installer..."
+        _hermes_installer=$(mktemp)
+        if curl --proto =https -fsSL https://hermes-agent.nousresearch.com/install.sh -o "$_hermes_installer"; then
+          bash "$_hermes_installer"
+        else
+          echo "dx.agents.hermes: FAILED to download installer" >&2
+        fi
+        rm -f "$_hermes_installer"
       fi
       ${lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
         agentId = "hermes";

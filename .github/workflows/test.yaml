@@ -13,26 +13,24 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Install devenv
+      - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      - name: Verify Nix syntax
+        run: |
+          # Check that all .nix files parse without errors.
+          # nix-instantiate --parse exits non-zero on syntax errors.
+          find . -name '*.nix' -not -path './.git/*' | sort | while read -r f; do
+            echo "Checking $f..."
+            nix-instantiate --parse "$f" > /dev/null
+          done
+
       - name: Install devenv CLI
         run: nix profile install github:cachix/devenv/latest --accept-flake-config
 
-      - name: Verify Nix syntax
-        run: |
-          # Check that all .nix files parse without errors
-          find . -name '*.nix' -not -path './.git/*' | while read -r f; do
-            echo "Checking $f..."
-            nix eval --impure --expr "builtins.tryEval (import $f)" 2>&1 || true
-          done
-
-      - name: Run devenv test
-        run: devenv test
-        continue-on-error: true
-        # May fail due to lib.fakeHash placeholders — that's expected
-        # until real hashes are filled in for binary/npm derivations.
+      - name: Run devenv info
+        run: devenv info

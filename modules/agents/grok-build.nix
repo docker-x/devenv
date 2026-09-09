@@ -21,8 +21,14 @@ in
     enterShell = ''
       # dx.agents.grok-build: install via upstream installer
       if ! command -v grok-build &>/dev/null; then
-        echo "dx.agents.grok-build: running upstream installer..."
-        curl --proto =https -fsSL https://x.ai/cli/install.sh | bash || true
+        echo "dx.agents.grok-build: downloading upstream installer..."
+        _grok_installer=$(mktemp)
+        if curl --proto =https -fsSL https://x.ai/cli/install.sh -o "$_grok_installer"; then
+          bash "$_grok_installer"
+        else
+          echo "dx.agents.grok-build: FAILED to download installer" >&2
+        fi
+        rm -f "$_grok_installer"
       fi
       ${lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
         agentId = "grok-build";

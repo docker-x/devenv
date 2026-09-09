@@ -6,6 +6,7 @@
 { lib, config, pkgs, ... }:
 
 let
+  helpers = import ../../lib/helpers.nix { inherit lib pkgs; };
   cfg = config.dx.agents.cao;
   agentConfigDir = config.dx.core.agentConfig.dir or "\${AGENT_CONFIG_DIR:-$HOME/.local/share/agent-config}";
 in
@@ -35,15 +36,14 @@ in
       # dx.agents.cao: install via uv tool
       if ! command -v cao &>/dev/null; then
         echo "dx.agents.cao: installing via uv..."
-        uv tool install "git+https://github.com/awslabs/cli-agent-orchestrator.git" --force 2>/dev/null || true
+        _cao_ref="${if cfg.version == "latest" then "" else "@${cfg.version}"}"
+        uv tool install "git+https://github.com/awslabs/cli-agent-orchestrator.git''${_cao_ref}" --force
       fi
-      ${lib.optionalString cfg.shareConfig ''
-        _AGENT_DIR="${"\${AGENT_CONFIG_DIR:-$HOME/.local/share/agent-config}"}/cao"
-        mkdir -p "$_AGENT_DIR"
-        if [[ ! -L "$HOME/.cao" ]]; then
-          ln -sfn "$_AGENT_DIR" "$HOME/.cao" 2>/dev/null || true
-        fi
-      ''}
+      ${lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
+        agentId = "cao";
+        configPaths = [ "$HOME/.cao" ];
+        agentConfigDir = toString agentConfigDir;
+      })}
     '';
   };
 }

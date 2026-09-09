@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "qwen-code";
-        npmName = "qwen-code";
+        npmName = "@qwen-code/qwen-code";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

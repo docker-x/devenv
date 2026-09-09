@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "amp";
-        npmName = "@sourcegraph/amp";
+        npmName = "@ampcode/cli";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

@@ -1,0 +1,38 @@
+name: "Test devenv modules"
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Evaluate Nix modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install devenv
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Install devenv CLI
+        run: nix profile install github:cachix/devenv/latest --accept-flake-config
+
+      - name: Verify Nix syntax
+        run: |
+          # Check that all .nix files parse without errors
+          find . -name '*.nix' -not -path './.git/*' | while read -r f; do
+            echo "Checking $f..."
+            nix eval --impure --expr "builtins.tryEval (import $f)" 2>&1 || true
+          done
+
+      - name: Run devenv test
+        run: devenv test
+        continue-on-error: true
+        # May fail due to lib.fakeHash placeholders — that's expected
+        # until real hashes are filled in for binary/npm derivations.

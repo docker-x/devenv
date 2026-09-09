@@ -1,6 +1,6 @@
 # dx.agents.goose — Goose CLI from Block
 # Migrated from: ghcr.io/docker-x/devcontainers/goose
-# Install method: upstream installer / binary release
+# Install method: GitHub release binary from aaif-goose/goose
 
 { lib, config, pkgs, ... }:
 
@@ -18,17 +18,24 @@ in
   config = lib.mkIf cfg.enable {
     dx.core.agentConfig.enable = lib.mkIf cfg.shareConfig true;
 
-    enterShell = ''
-      # dx.agents.goose: install via upstream installer
-      if ! command -v goose &>/dev/null; then
-        echo "dx.agents.goose: running upstream installer..."
-        curl --proto =https -fsSL https://github.com/block/goose/releases/download/stable/download.sh | bash || true
-      fi
-      ${lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
-        agentId = "goose";
-        configPaths = [ "$HOME/.goose" "$HOME/.config/goose" ];
-        agentConfigDir = toString agentConfigDir;
-      })}
-    '';
+    packages = [
+      (helpers.mkGithubBinary {
+        pname = "goose";
+        version = if cfg.version == "latest" then "latest" else cfg.version;
+        owner = "aaif-goose";
+        repo = "goose";
+        asset = "goose-linux-amd64.tar.gz";
+        sha256 = lib.fakeHash;
+        postInstall = ''
+          tar xzf $out/bin/goose 2>/dev/null || true
+        '';
+      })
+    ];
+
+    enterShell = lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
+      agentId = "goose";
+      configPaths = [ "$HOME/.goose" "$HOME/.config/goose" ];
+      agentConfigDir = toString agentConfigDir;
+    });
   };
 }

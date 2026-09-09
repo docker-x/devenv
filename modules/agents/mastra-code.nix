@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "mastra-code";
-        npmName = "mastra-code";
+        npmName = "mastracode";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

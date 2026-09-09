@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "kimi";
-        npmName = "@kimi-ai/kimi-code";
+        npmName = "@moonshot-ai/kimi-code";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

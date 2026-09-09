@@ -1,6 +1,6 @@
 # dx.agents.hermes — Hermes Agent from Nous Research
 # Migrated from: ghcr.io/docker-x/devcontainers/hermes
-# Install method: GitHub release binary
+# Install method: upstream install script (https://hermes-agent.nousresearch.com/install.sh)
 
 { lib, config, pkgs, ... }:
 
@@ -18,21 +18,17 @@ in
   config = lib.mkIf cfg.enable {
     dx.core.agentConfig.enable = lib.mkIf cfg.shareConfig true;
 
-    packages = [
-      (helpers.mkGithubBinary {
-        pname = "hermes";
-        version = if cfg.version == "latest" then "latest" else cfg.version;
-        owner = "NousResearch";
-        repo = "hermes";
-        asset = "hermes-linux-amd64";
-        sha256 = lib.fakeHash;
-      })
-    ];
-
-    enterShell = lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
-      agentId = "hermes";
-      configPaths = [ "$HOME/.hermes" "$HOME/.config/hermes" ];
-      agentConfigDir = toString agentConfigDir;
-    });
+    enterShell = ''
+      # dx.agents.hermes: install via upstream installer
+      if ! command -v hermes &>/dev/null; then
+        echo "dx.agents.hermes: running upstream installer..."
+        curl --proto =https -fsSL https://hermes-agent.nousresearch.com/install.sh | bash || true
+      fi
+      ${lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
+        agentId = "hermes";
+        configPaths = [ "$HOME/.hermes" "$HOME/.config/hermes" ];
+        agentConfigDir = toString agentConfigDir;
+      })}
+    '';
   };
 }

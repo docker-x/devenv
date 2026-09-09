@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "crush";
-        npmName = "crush";
+        npmName = "@charmland/crush";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

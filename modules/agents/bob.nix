@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "bob";
-        npmName = "bob";
+        npmName = "@roo-code/bob-shell";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

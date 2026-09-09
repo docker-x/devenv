@@ -1,6 +1,7 @@
 # dx.agents.herdr — Herdr
 # Migrated from: ghcr.io/docker-x/devcontainers/herdr
-# Install method: GitHub release binary
+# Install method: GitHub release binary from herdrdev/herdr
+# Version manifest at https://herdr.dev/latest.json
 
 { lib, config, pkgs, ... }:
 
@@ -22,9 +23,9 @@ in
       (helpers.mkGithubBinary {
         pname = "herdr";
         version = if cfg.version == "latest" then "latest" else cfg.version;
-        owner = "herdr";
+        owner = "herdrdev";
         repo = "herdr";
-        asset = "herdr-linux-amd64";
+        asset = "herdr-x86_64-unknown-linux-gnu";
         sha256 = lib.fakeHash;
       })
     ];

@@ -1,0 +1,8 @@
+# devenv.yaml — docker-x/devenv module library
+#
+# This file is used when developing/testing this repo itself.
+# Downstream projects consume docker-x/devenv by adding it as an input
+# in their own devenv.yaml (see examples/).
+inputs:
+  nixpkgs:
+    url: github:cachix/devenv-nixpkgs/rolling

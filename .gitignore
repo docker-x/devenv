@@ -1,0 +1,15 @@
+# devenv
+.devenv/
+devenv.lock
+
+# Nix
+result
+result-*
+
+# Editor
+.direnv/
+.vscode/
+.idea/
+
+# OS
+.DS_Store

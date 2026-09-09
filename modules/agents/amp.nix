@@ -1,6 +1,6 @@
-# dx.agents.amp — Amp from Sourcegraph
+# dx.agents.amp — Amp from Ampcode
 # Migrated from: ghcr.io/docker-x/devcontainers/amp
-# npm package: @sourcegraph/amp
+# npm package: @ampcode/cli
 
 { lib, config, pkgs, ... }:
 

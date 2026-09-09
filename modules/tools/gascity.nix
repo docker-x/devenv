@@ -51,7 +51,7 @@ in
         version = "latest";
         owner = "dolthub";
         repo = "dolt";
-        asset = "dolt-linux-amd64";
+        asset = "dolt-linux-amd64.tar.gz";
         sha256 = lib.fakeHash;
       })
     ];
@@ -60,7 +60,6 @@ in
       exec = ''
         gc register --auto
       '';
-      processManager = "hivemind";
     };
   };
 }

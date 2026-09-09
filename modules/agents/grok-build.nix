@@ -20,7 +20,7 @@ in
 
     enterShell = ''
       # dx.agents.grok-build: install via upstream installer
-      if ! command -v grok-build &>/dev/null; then
+      if ! command -v grok &>/dev/null; then
         echo "dx.agents.grok-build: downloading upstream installer..."
         _grok_installer=$(mktemp)
         if curl --proto =https -fsSL https://x.ai/cli/install.sh -o "$_grok_installer"; then

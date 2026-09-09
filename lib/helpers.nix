@@ -100,53 +100,77 @@ let
     , postInstall ? ""
     }:
     let
-      # For "latest", use the npm registry redirect endpoint which resolves
-      # to the most recent version's tarball. For pinned versions, construct
-      # the tarball URL directly.
-      tarballUrl =
-        if version == "latest"
-        then "https://registry.npmjs.org/${npmName}/-/${builtins.baseNameOf npmName}-latest.tgz"
-        else "https://registry.npmjs.org/${npmName}/-/${builtins.baseNameOf npmName}-${version}.tgz";
+      # For pinned versions, fetch the tarball at build time.
+      # For "latest", create a wrapper script that uses npx at runtime,
+      # since the npm registry doesn't serve a "latest" tarball URL.
+      baseName = builtins.baseNameOf npmName;
     in
-    pkgs.stdenv.mkDerivation {
-      inherit pname version postInstall;
+    if version == "latest"
+    then
+      # Runtime fallback: wrapper script that delegates to npx.
+      # This avoids needing to resolve "latest" to a concrete version at
+      # build time. Less efficient than a pinned install but always works.
+      pkgs.stdenv.mkDerivation {
+        inherit pname;
+        version = "latest";
 
-      src = pkgs.fetchurl {
-        url = tarballUrl;
-        inherit sha256;
+        nativeBuildInputs = [ pkgs.nodejs ];
+
+        dontUnpack = true;
+        dontBuild = true;
+
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out/bin
+          cat > $out/bin/${pname} << 'WRAPPER'
+          #!/bin/sh
+          exec npx --yes ${npmName}@latest "$@"
+"
+          WRAPPER
+          chmod +x $out/bin/${pname}
+          runHook postInstall
+        '';
+
+        meta.mainProgram = pname;
+      }
+    else
+      pkgs.stdenv.mkDerivation {
+        inherit pname version postInstall;
+
+        src = pkgs.fetchurl {
+          url = "https://registry.npmjs.org/${npmName}/-/${baseName}-${version}.tgz";
+          inherit sha256;
+        };
+
+        nativeBuildInputs = [ pkgs.nodejs ];
+
+        dontUnpack = true;
+        dontBuild = true;
+
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out/lib/node_modules $out/bin
+          npm install -g --prefix $out "$src" --ignore-scripts 2>&1 || {
+            echo "Error: npm install failed for ${pname}" >&2
+            exit 1
+          }
+          # Link all bin entries from the installed package
+          _pkgdir="$out/lib/node_modules/${npmName}"
+          if [[ -d "$_pkgdir/bin" ]]; then
+            for bin in "$_pkgdir"/bin/*; do
+              ln -sf "$bin" "$out/bin/$(basename "$bin")"
+            done
+          elif [[ -f "$_pkgdir/package.json" ]]; then
+            _bins=$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; Object.keys(b).forEach(k=>console.log(k))" 2>/dev/null || true)
+            for bin in $_bins; do
+              ln -sf "$_pkgdir/$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; console.log(typeof b==='string'?b:b['$bin'])" 2>/dev/null)" "$out/bin/$bin" 2>/dev/null || true
+            done
+          fi
+          runHook postInstall
+        '';
+
+        meta.mainProgram = pname;
       };
-
-      nativeBuildInputs = [ pkgs.nodejs pkgs.npm-hook ];
-
-      dontUnpack = true;
-      dontBuild = true;
-
-      installPhase = ''
-        runHook preInstall
-        mkdir -p $out/lib/node_modules $out/bin
-        # Install from the fetched tarball
-        npm install -g --prefix $out "$src" --ignore-scripts 2>&1 || {
-          echo "Warning: npm install failed for ${pname}" >&2
-          exit 1
-        }
-        # Link all bin entries from the installed package
-        _pkgdir="$out/lib/node_modules/${npmName}"
-        if [[ -d "$_pkgdir/bin" ]]; then
-          for bin in "$_pkgdir"/bin/*; do
-            ln -sf "$bin" "$out/bin/$(basename "$bin")"
-          done
-        elif [[ -f "$_pkgdir/package.json" ]]; then
-          # Some packages declare bins in package.json
-          _bins=$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; Object.keys(b).forEach(k=>console.log(k))" 2>/dev/null || true)
-          for bin in $_bins; do
-            ln -sf "$_pkgdir/$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; console.log(typeof b==='string'?b:b['$bin'])" 2>/dev/null)" "$out/bin/$bin" 2>/dev/null || true
-          done
-        fi
-        runHook postInstall
-      '';
-
-      meta.mainProgram = pname;
-    };
 
   # ---------------------------------------------------------------------------
   # mkScriptCli — install a CLI via an upstream install script.

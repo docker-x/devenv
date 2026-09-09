@@ -30,10 +30,12 @@ let
     , postInstall ? ""
     }:
     let
-      # GitHub uses /releases/latest/download/ for the latest release,
-      # not /releases/download/latest/ which returns 404.
-      versionPath = if version == "latest" then "latest/download" else "${version}/download";
+      # GitHub release URL format:
+      #   Pinned:  /releases/download/${version}/${asset}
+      #   Latest:  /releases/latest/download/${asset}
+      versionPath = if version == "latest" then "latest/download" else "download/${version}";
       isArchive = builtins.match ".*\\.(tar\\.(gz|bz2|xz)|tgz|zip)$" asset != null;
+      isZip = builtins.match ".*\\.zip$" asset != null;
     in
     pkgs.stdenv.mkDerivation {
       inherit pname version postInstall;
@@ -47,26 +49,38 @@ let
       dontUnpack = !isArchive;
       dontBuild = true;
 
+      nativeBuildInputs = lib.optional isArchive pkgs.unzip;
+
       installPhase = ''
         runHook preInstall
         mkdir -p $out/bin
         ${if isArchive then ''
-          # Extract archive and find the binary
+          # Extract archive to a temp dir and find the binary.
+          # The archive itself is excluded from the search to avoid
+          # matching it as the binary.
           _tmpdir=$(mktemp -d)
-          cp $src "$_tmpdir/${asset}"
-          ${lib.optionalString (builtins.match ".*\\.zip$" asset != null) "unzip"}
-          tar xf "$_tmpdir/${asset}" -C "$_tmpdir" 2>/dev/null || unzip "$_tmpdir/${asset}" -d "$_tmpdir" 2>/dev/null || true
-          # Find the binary: either matches pname or is the only executable
-          _bin=$(find "$_tmpdir" -type f -name "${pname}" -o -type f -name "${pname}-*" 2>/dev/null | head -1)
+          _extractdir="$_tmpdir/extracted"
+          mkdir -p "$_extractdir"
+          ${if isZip then ''
+            unzip "$src" -d "$_extractdir"
+          '' else ''
+            tar xf "$src" -C "$_extractdir"
+          ''}
+          # Find the binary: either matches pname or is the only executable.
+          # Exclude the archive file itself from the search.
+          _bin=$(find "$_extractdir" -type f -name "${pname}" 2>/dev/null | head -1)
           if [[ -z "$_bin" ]]; then
-            _bin=$(find "$_tmpdir" -type f -executable 2>/dev/null | head -1)
+            _bin=$(find "$_extractdir" -type f -name "${pname}-*" 2>/dev/null | head -1)
+          fi
+          if [[ -z "$_bin" ]]; then
+            _bin=$(find "$_extractdir" -type f -executable 2>/dev/null | head -1)
           fi
           if [[ -n "$_bin" ]]; then
             cp "$_bin" $out/bin/${pname}
             chmod +x $out/bin/${pname}
           else
-            echo "Warning: could not find ${pname} binary in archive" >&2
-            cp "$_tmpdir/${asset}" $out/bin/${pname}
+            echo "Error: could not find ${pname} binary in archive ${asset}" >&2
+            exit 1
           fi
           rm -rf "$_tmpdir"
         '' else ''

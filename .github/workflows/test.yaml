@@ -6,12 +6,17 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Evaluate Nix modules
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -32,5 +37,20 @@ jobs:
       - name: Install devenv CLI
         run: nix profile install github:cachix/devenv/latest --accept-flake-config
 
-      - name: Run devenv info
+      - name: Run devenv info (base evaluation)
         run: devenv info
+
+      - name: Evaluate with representative modules enabled
+        run: |
+          # Test that modules actually evaluate when enabled.
+          # This catches issues that devenv info alone won't find
+          # (e.g. broken package derivations, invalid option types).
+          cat > .devenv-extra.nix << 'EOF'
+          {
+            dx.core.agentConfig.enable = true;
+            dx.runtimes.bun.enable = true;
+            dx.agents.claudeCode.enable = true;
+            dx.tools.caddy-proxy.enable = true;
+          }
+          EOF
+          devenv info

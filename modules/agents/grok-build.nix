@@ -24,7 +24,9 @@ in
         echo "dx.agents.grok-build: downloading upstream installer..."
         _grok_installer=$(mktemp)
         if curl --proto =https -fsSL https://x.ai/cli/install.sh -o "$_grok_installer"; then
-          bash "$_grok_installer"
+          if ! bash "$_grok_installer" ${lib.optionalString (cfg.version != "latest") ''"$${cfg.version}"''}; then
+            echo "dx.agents.grok-build: installer execution failed" >&2
+          fi
         else
           echo "dx.agents.grok-build: FAILED to download installer" >&2
         fi

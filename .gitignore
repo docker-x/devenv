@@ -13,3 +13,4 @@ result-*
 
 # OS
 .DS_Store
+tmp/

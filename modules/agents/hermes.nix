@@ -24,7 +24,7 @@ in
         echo "dx.agents.hermes: downloading upstream installer..."
         _hermes_installer=$(mktemp)
         if curl --proto =https -fsSL https://hermes-agent.nousresearch.com/install.sh -o "$_hermes_installer"; then
-          if ! bash "$_hermes_installer" ${lib.optionalString (cfg.version != "latest") ''--branch "${cfg.version}"''}; then
+          if ! bash "$_hermes_installer" ${lib.optionalString (cfg.version != "latest") "--branch ${lib.escapeShellArg cfg.version}"}; then
             echo "dx.agents.hermes: installer execution failed" >&2
           fi
         else

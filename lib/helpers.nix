@@ -45,8 +45,8 @@ let
         inherit sha256;
       };
 
-      # Archives need unpacking; raw binaries don't.
-      dontUnpack = !isArchive;
+      # Always skip unpackPhase — installPhase handles extraction for archives.
+      dontUnpack = true;
       dontBuild = true;
 
       nativeBuildInputs = lib.optional isArchive pkgs.unzip;
@@ -73,7 +73,7 @@ let
             _bin=$(find "$_extractdir" -type f -name "${pname}-*" 2>/dev/null | head -1)
           fi
           if [[ -z "$_bin" ]]; then
-            _bin=$(find "$_extractdir" -type f -executable 2>/dev/null | head -1)
+            _bin=$(find "$_extractdir" -type f -executable 2>/dev/null | sort | head -1)
           fi
           if [[ -n "$_bin" ]]; then
             cp "$_bin" $out/bin/${pname}

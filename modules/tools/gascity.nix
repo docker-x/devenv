@@ -58,7 +58,7 @@ in
 
     processes.gascity-register = lib.mkIf cfg.autoRegister {
       exec = ''
-        gc register --auto
+        gc register .
       '';
     };
   };

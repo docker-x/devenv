@@ -21,9 +21,8 @@ in
     enable = lib.mkEnableOption "shared agent configuration directory (AGENT_CONFIG_DIR)";
 
     dir = lib.mkOption {
-      type = lib.types.path;
-      default = "${config.env.HOME or "$HOME"}/.local/share/agent-config";
-      defaultText = "\$HOME/.local/share/agent-config";
+      type = lib.types.str;
+      default = "$HOME/.local/share/agent-config";
       description = ''
         Path to the shared agent config directory. All agent modules with
         `shareConfig = true` will symlink their config into subdirectories

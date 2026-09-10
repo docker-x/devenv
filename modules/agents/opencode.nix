@@ -28,7 +28,7 @@ in
     packages = lib.optional (cfg.installMethod == "npm")
       (helpers.mkNpmCli {
         pname = "opencode";
-        npmName = "opencode";
+        npmName = "opencode-ai";
         version = cfg.version;
         sha256 = lib.fakeHash;
       }) ++ lib.optional (cfg.installMethod == "binary")

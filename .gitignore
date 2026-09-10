@@ -1,6 +1,7 @@
 # devenv
 .devenv/
 devenv.lock
+devenv.local.nix
 
 # Nix
 result
@@ -13,3 +14,4 @@ result-*
 
 # OS
 .DS_Store
+tmp/

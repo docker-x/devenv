@@ -1,6 +1,6 @@
-# dx.agents.amp — Amp from Sourcegraph
+# dx.agents.amp — Amp from Ampcode
 # Migrated from: ghcr.io/docker-x/devcontainers/amp
-# npm package: @sourcegraph/amp
+# npm package: @ampcode/cli
 
 { lib, config, pkgs, ... }:
 
@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "amp";
-        npmName = "@sourcegraph/amp";
+        npmName = "@ampcode/cli";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

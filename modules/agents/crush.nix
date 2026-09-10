@@ -1,6 +1,6 @@
 # dx.agents.crush — Crush CLI from Charm
 # Migrated from: ghcr.io/docker-x/devcontainers/crush
-# npm package: crush
+# npm package: @charmland/crush
 
 { lib, config, pkgs, ... }:
 
@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "crush";
-        npmName = "crush";
+        npmName = "@charmland/crush";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

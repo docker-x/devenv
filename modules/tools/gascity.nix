@@ -1,6 +1,7 @@
 # dx.tools.gascity — Gas City
 # Migrated from: ghcr.io/docker-x/devcontainers/gascity
-# AI agent orchestration platform: gc, bd, dolt binaries + entrypoint.
+# AI agent orchestration platform: gc, bd binaries from gastownhall/gascity
+# + dolt from dolthub/dolt. Entry point for auto-register.
 
 { lib, config, pkgs, ... }:
 
@@ -29,7 +30,6 @@ in
     packages = [
       pkgs.tmux
       pkgs.jq
-      pkgs.dolt
       (helpers.mkGithubBinary {
         pname = "gc";
         version = if cfg.version == "latest" then "latest" else cfg.version;
@@ -46,10 +46,20 @@ in
         asset = "bd-linux-amd64";
         sha256 = lib.fakeHash;
       })
+      (helpers.mkGithubBinary {
+        pname = "dolt";
+        version = "latest";
+        owner = "dolthub";
+        repo = "dolt";
+        asset = "dolt-linux-amd64.tar.gz";
+        sha256 = lib.fakeHash;
+      })
     ];
 
-    processes.gascity.exec = lib.mkIf cfg.autoRegister ''
-      gc register --auto 2>/dev/null || true
-    '';
+    processes.gascity-register = lib.mkIf cfg.autoRegister {
+      exec = ''
+        gc register .
+      '';
+    };
   };
 }

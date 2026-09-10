@@ -1,7 +1,7 @@
 # dx.infra.devpod — DevPod agent (legacy)
 # Migrated from: ghcr.io/docker-x/devcontainers/devpod
-# Pre-installs the DevPod agent binary. DevPod is unmaintained —
-# use only for rollback during DevPod->Devsy migration.
+# Pre-installs the DevPod agent binary from loft-sh/devpod.
+# DevPod is unmaintained — use only for rollback during DevPod->Devsy migration.
 
 { lib, config, pkgs, ... }:
 

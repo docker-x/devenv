@@ -31,7 +31,7 @@ in
       pkgs.shadow
     ];
 
-    env.HOME = lib.mkForce (config.env.HOME or "$HOME");
+    env.HOME = lib.mkForce "$HOME";
 
     processes.sshd.exec = ''
       # Generate host keys if missing

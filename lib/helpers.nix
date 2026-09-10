@@ -29,22 +29,64 @@ let
     , sha256 ? lib.fakeHash
     , postInstall ? ""
     }:
+    let
+      # GitHub release URL format:
+      #   Pinned:  /releases/download/${version}/${asset}
+      #   Latest:  /releases/latest/download/${asset}
+      versionPath = if version == "latest" then "latest/download" else "download/${version}";
+      isArchive = builtins.match ".*\\.(tar\\.(gz|bz2|xz)|tgz|zip)$" asset != null;
+      isZip = builtins.match ".*\\.zip$" asset != null;
+    in
     pkgs.stdenv.mkDerivation {
       inherit pname version postInstall;
 
       src = pkgs.fetchurl {
-        url = "https://github.com/${owner}/${repo}/releases/download/${version}/${asset}";
+        url = "https://github.com/${owner}/${repo}/releases/${versionPath}/${asset}";
         inherit sha256;
       };
 
+      # Always skip unpackPhase — installPhase handles extraction for archives.
       dontUnpack = true;
       dontBuild = true;
+
+      nativeBuildInputs = lib.optional isArchive pkgs.unzip;
 
       installPhase = ''
         runHook preInstall
         mkdir -p $out/bin
-        cp $src $out/bin/${pname}
-        chmod +x $out/bin/${pname}
+        ${if isArchive then ''
+          # Extract archive to a temp dir and find the binary.
+          # The archive itself is excluded from the search to avoid
+          # matching it as the binary.
+          _tmpdir=$(mktemp -d)
+          _extractdir="$_tmpdir/extracted"
+          mkdir -p "$_extractdir"
+          ${if isZip then ''
+            unzip "$src" -d "$_extractdir"
+          '' else ''
+            tar xf "$src" -C "$_extractdir"
+          ''}
+          # Find the binary: either matches pname or is the only executable.
+          # Exclude the archive file itself from the search.
+          _bin=$(find "$_extractdir" -type f -name "${pname}" 2>/dev/null | head -1)
+          if [[ -z "$_bin" ]]; then
+            _bin=$(find "$_extractdir" -type f -name "${pname}-*" 2>/dev/null | head -1)
+          fi
+          if [[ -z "$_bin" ]]; then
+            _bin=$(find "$_extractdir" -type f -executable 2>/dev/null | sort | head -1)
+          fi
+          if [[ -n "$_bin" ]]; then
+            cp "$_bin" $out/bin/${pname}
+            chmod +x $out/bin/${pname}
+          else
+            echo "Error: could not find ${pname} binary in archive ${asset}" >&2
+            exit 1
+          fi
+          rm -rf "$_tmpdir"
+        '' else ''
+          cp $src $out/bin/${pname}
+          chmod +x $out/bin/${pname}
+        ''}
         runHook postInstall
       '';
 
@@ -71,29 +113,77 @@ let
     , sha256 ? lib.fakeHash
     , postInstall ? ""
     }:
-    pkgs.buildNpmPackage {
-      inherit pname version postInstall;
+    let
+      # For pinned versions, fetch the tarball at build time.
+      # For "latest", create a wrapper script that uses npx at runtime,
+      # since the npm registry doesn't serve a "latest" tarball URL.
+      baseName = builtins.baseNameOf npmName;
+    in
+    if version == "latest"
+    then
+      # Runtime fallback: wrapper script that delegates to npx.
+      # This avoids needing to resolve "latest" to a concrete version at
+      # build time. Less efficient than a pinned install but always works.
+      pkgs.stdenv.mkDerivation {
+        inherit pname postInstall;
+        version = "latest";
 
-      npmDepsHash = sha256;
+        nativeBuildInputs = [ pkgs.nodejs ];
 
-      src = pkgs.fetchurl {
-        url = "https://registry.npmjs.org/${npmName}/-/${builtins.baseNameOf npmName}-${version}.tgz";
-        inherit sha256;
+        dontUnpack = true;
+        dontBuild = true;
+
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out/bin
+          cat > $out/bin/${pname} << 'WRAPPER'
+#!/bin/sh
+exec ${pkgs.nodejs}/bin/npx --yes ${npmName}@latest "$@"
+WRAPPER
+          chmod +x $out/bin/${pname}
+          runHook postInstall
+        '';
+
+        meta.mainProgram = pname;
+      }
+    else
+      pkgs.stdenv.mkDerivation {
+        inherit pname version postInstall;
+
+        src = pkgs.fetchurl {
+          url = "https://registry.npmjs.org/${npmName}/-/${baseName}-${version}.tgz";
+          inherit sha256;
+        };
+
+        nativeBuildInputs = [ pkgs.nodejs ];
+
+        dontUnpack = true;
+        dontBuild = true;
+
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out/lib/node_modules $out/bin
+          npm install -g --prefix $out "$src" --ignore-scripts 2>&1 || {
+            echo "Error: npm install failed for ${pname}" >&2
+            exit 1
+          }
+          # Link all bin entries from the installed package
+          _pkgdir="$out/lib/node_modules/${npmName}"
+          if [[ -d "$_pkgdir/bin" ]]; then
+            for bin in "$_pkgdir"/bin/*; do
+              ln -sf "$bin" "$out/bin/$(basename "$bin")"
+            done
+          elif [[ -f "$_pkgdir/package.json" ]]; then
+            _bins=$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; Object.keys(b).forEach(k=>console.log(k))" 2>/dev/null || true)
+            for bin in $_bins; do
+              ln -sf "$_pkgdir/$(node -e "const p=require('$_pkgdir/package.json'); const b=p.bin||{}; console.log(typeof b==='string'?b:b['$bin'])" 2>/dev/null)" "$out/bin/$bin" 2>/dev/null || true
+            done
+          fi
+          runHook postInstall
+        '';
+
+        meta.mainProgram = pname;
       };
-
-      dontNpmBuild = true;
-
-      installPhase = ''
-        runHook preInstall
-        mkdir -p $out/bin $out/lib/node_modules
-        npm install --prefix $out/lib ${npmName}@${version} --ignore-scripts
-        # Link all bin entries
-        for bin in $out/lib/node_modules/${npmName}/bin/*; do
-          ln -sf "$bin" "$out/bin/$(basename "$bin")"
-        done
-        runHook postInstall
-      '';
-    };
 
   # ---------------------------------------------------------------------------
   # mkScriptCli — install a CLI via an upstream install script.

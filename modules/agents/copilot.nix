@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "copilot";
-        npmName = "@github/copilot-cli";
+        npmName = "@github/copilot";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

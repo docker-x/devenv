@@ -1,0 +1,57 @@
+name: "Test devenv modules"
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Evaluate Nix modules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Verify Nix syntax
+        run: |
+          # Check that all .nix files parse without errors.
+          # nix-instantiate --parse exits non-zero on syntax errors.
+          find . -name '*.nix' -not -path './.git/*' | sort | while read -r f; do
+            echo "Checking $f..."
+            nix-instantiate --parse "$f" > /dev/null
+          done
+
+      - name: Install devenv CLI
+        run: nix profile install github:cachix/devenv/latest --accept-flake-config
+
+      - name: Run devenv info (base evaluation)
+        run: devenv info
+
+      - name: Evaluate with representative modules enabled
+        run: |
+          # Test that modules actually evaluate when enabled.
+          # This catches issues that devenv info alone won't find
+          # (e.g. broken package derivations, invalid option types).
+          # devenv auto-loads devenv.local.nix as a local override.
+          cat > devenv.local.nix << 'EOF'
+          {
+            dx.core.agentConfig.enable = true;
+            dx.runtimes.bun.enable = true;
+            dx.agents.claudeCode.enable = true;
+            dx.tools.caddyProxy.enable = true;
+          }
+          EOF
+          devenv info

@@ -1,6 +1,6 @@
 # dx.agents.docker-agent — Docker Agent
 # Migrated from: ghcr.io/docker-x/devcontainers/docker-agent
-# Install method: GitHub release binary
+# Install method: GitHub release binary from docker/docker-agent
 
 { lib, config, pkgs, ... }:
 
@@ -22,7 +22,7 @@ in
       (helpers.mkGithubBinary {
         pname = "docker-agent";
         version = if cfg.version == "latest" then "latest" else cfg.version;
-        owner = "docker-agent";
+        owner = "docker";
         repo = "docker-agent";
         asset = "docker-agent-linux-amd64";
         sha256 = lib.fakeHash;

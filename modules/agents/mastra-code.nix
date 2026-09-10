@@ -1,6 +1,6 @@
 # dx.agents.mastra-code — Mastra Code
 # Migrated from: ghcr.io/docker-x/devcontainers/mastra-code
-# npm package: mastra-code
+# npm package: mastracode
 
 { lib, config, pkgs, ... }:
 
@@ -21,7 +21,7 @@ in
     packages = [
       (helpers.mkNpmCli {
         pname = "mastra-code";
-        npmName = "mastra-code";
+        npmName = "mastracode";
         version = cfg.version;
         sha256 = lib.fakeHash;
       })

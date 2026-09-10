@@ -1,6 +1,6 @@
 # dx.agents.grok-build — Grok Build from xAI
 # Migrated from: ghcr.io/docker-x/devcontainers/grok-build
-# Install method: GitHub release binary
+# Install method: upstream install script (https://x.ai/cli/install.sh)
 
 { lib, config, pkgs, ... }:
 
@@ -18,21 +18,25 @@ in
   config = lib.mkIf cfg.enable {
     dx.core.agentConfig.enable = lib.mkIf cfg.shareConfig true;
 
-    packages = [
-      (helpers.mkGithubBinary {
-        pname = "grok-build";
-        version = if cfg.version == "latest" then "latest" else cfg.version;
-        owner = "xai";
-        repo = "grok-build";
-        asset = "grok-build-linux-amd64";
-        sha256 = lib.fakeHash;
-      })
-    ];
-
-    enterShell = lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
-      agentId = "grok-build";
-      configPaths = [ "$HOME/.grok-build" "$HOME/.config/grok-build" ];
-      agentConfigDir = toString agentConfigDir;
-    });
+    enterShell = ''
+      # dx.agents.grok-build: install via upstream installer
+      if ! command -v grok &>/dev/null; then
+        echo "dx.agents.grok-build: downloading upstream installer..."
+        _grok_installer=$(mktemp)
+        if curl --proto =https -fsSL https://x.ai/cli/install.sh -o "$_grok_installer"; then
+          if ! bash "$_grok_installer" ${lib.optionalString (cfg.version != "latest") lib.escapeShellArg cfg.version}; then
+            echo "dx.agents.grok-build: installer execution failed" >&2
+          fi
+        else
+          echo "dx.agents.grok-build: FAILED to download installer" >&2
+        fi
+        rm -f "$_grok_installer"
+      fi
+      ${lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
+        agentId = "grok-build";
+        configPaths = [ "$HOME/.grok-build" "$HOME/.config/grok-build" ];
+        agentConfigDir = toString agentConfigDir;
+      })}
+    '';
   };
 }

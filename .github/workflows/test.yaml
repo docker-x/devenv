@@ -45,12 +45,13 @@ jobs:
           # Test that modules actually evaluate when enabled.
           # This catches issues that devenv info alone won't find
           # (e.g. broken package derivations, invalid option types).
-          cat > .devenv-extra.nix << 'EOF'
+          # devenv auto-loads devenv.local.nix as a local override.
+          cat > devenv.local.nix << 'EOF'
           {
             dx.core.agentConfig.enable = true;
             dx.runtimes.bun.enable = true;
             dx.agents.claudeCode.enable = true;
-            dx.tools.caddy-proxy.enable = true;
+            dx.tools.caddyProxy.enable = true;
           }
           EOF
           devenv info

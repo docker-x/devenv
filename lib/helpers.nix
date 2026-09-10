@@ -125,7 +125,7 @@ let
       # This avoids needing to resolve "latest" to a concrete version at
       # build time. Less efficient than a pinned install but always works.
       pkgs.stdenv.mkDerivation {
-        inherit pname;
+        inherit pname postInstall;
         version = "latest";
 
         nativeBuildInputs = [ pkgs.nodejs ];
@@ -137,10 +137,9 @@ let
           runHook preInstall
           mkdir -p $out/bin
           cat > $out/bin/${pname} << 'WRAPPER'
-          #!/bin/sh
-          exec npx --yes ${npmName}@latest "$@"
-"
-          WRAPPER
+#!/bin/sh
+exec ${pkgs.nodejs}/bin/npx --yes ${npmName}@latest "$@"
+WRAPPER
           chmod +x $out/bin/${pname}
           runHook postInstall
         '';

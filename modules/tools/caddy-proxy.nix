@@ -28,14 +28,17 @@ in
     packages = [ pkgs.caddy ];
 
     processes.caddy-proxy.exec = ''
-      caddy run --adapter caddyfile --config <(echo '{
+      caddy run --adapter caddyfile --config <(cat <<'CADDYEOF'
+      {
         admin :${toString cfg.adminPort}
-        :${toString cfg.listenPort} {
-          reverse_proxy /* {
-            dynamic_suffix
-          }
+      }
+      :${toString cfg.listenPort} {
+        reverse_proxy /* {
+          dynamic_suffix
         }
-      }')
+      }
+CADDYEOF
+)
     '';
   };
 }

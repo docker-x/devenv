@@ -189,7 +189,7 @@ function resolveTargetFile(distDir, requestPath) {
 function resolveContentEncoding(resolvedFile, acceptEncoding) {
     const encoding = selectEncoding(acceptEncoding);
     if (!encoding) { return { finalFile: resolvedFile, contentEncoding: null }; }
-    const compressedFile = `\${resolvedFile}.\${encoding === "br" ? "br" : "gz"}`;
+    const compressedFile = `''\${resolvedFile}.''\${encoding === "br" ? "br" : "gz"}`;
     const compressedStat = safeStat(compressedFile);
     if (compressedStat?.isFile()) { return { finalFile: compressedFile, contentEncoding: encoding }; }
     return { finalFile: resolvedFile, contentEncoding: null };
@@ -262,9 +262,9 @@ function injectConnectionHint(html, req, label) {
     const defaultPort = useTls ? 443 : 80;
     const hostWithPort = host.includes(":") ? host : host + ":" + defaultPort;
     const hint = { listen: hostWithPort, useTls, label };
-    const script = `<script>window.__PASEO_INITIAL_DAEMON_CONNECTION__=\${serializeInlineScriptJson(hint)}</script>`;
+    const script = `<script>window.__PASEO_INITIAL_DAEMON_CONNECTION__=''\${serializeInlineScriptJson(hint)}</script>`;
     const headClose = /<\/head>/i;
-    if (headClose.test(html)) { return html.replace(headClose, `\${script}</head>`); }
+    if (headClose.test(html)) { return html.replace(headClose, `''\${script}</head>`); }
     return script + html;
 }
 //# sourceMappingURL=web-ui.js.map

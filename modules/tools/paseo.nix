@@ -46,11 +46,16 @@ in
       # dx.tools.paseo: ensure .paseo directory exists
       mkdir -p "$HOME/.paseo"
 
-      # dx.tools.paseo: generate config.json if it doesn't exist
+      # dx.tools.paseo: generate config.json if it doesn't exist or is outdated
       # The config enables relay, MCP injection, terminal agent hooks,
       # and configures the Devin agent provider via ACP.
+      # Uses a version marker so config is regenerated when we update the template.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      if [ ! -f "$PASEO_CONFIG" ]; then
+      PASEO_CONFIG_VERSION="2"
+      PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
+      CURRENT_VERSION=""
+      [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
+      if [ ! -f "$PASEO_CONFIG" ] || [ "$CURRENT_VERSION" != "$PASEO_CONFIG_VERSION" ]; then
         cat > "$PASEO_CONFIG" << 'PASEOEOF'
 {
   "version": 1,
@@ -104,6 +109,7 @@ in
 }
 PASEOEOF
         chmod 600 "$PASEO_CONFIG"
+        echo "$PASEO_CONFIG_VERSION" > "$PASEO_VERSION_FILE"
       fi
 
       # dx.tools.paseo: create workspace directory for projects

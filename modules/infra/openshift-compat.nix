@@ -41,13 +41,28 @@ in
       if [[ ! -f "$SSH_KEY_DIR/ssh_host_ed25519_key" ]]; then
         ssh-keygen -t ed25519 -f "$SSH_KEY_DIR/ssh_host_ed25519_key" -N "" 2>/dev/null || true
       fi
-      # Start sshd on the configured port with the generated host key.
-      # Use absolute path — sshd refuses to run without it.
+      # Minimal sshd_config — /etc/ssh/sshd_config doesn't exist in the container.
+      SSHD_CFG="$SSH_KEY_DIR/sshd_config"
+      cat > "$SSHD_CFG" <<'SSHDCFG'
+      Port 2222
+      HostKey dummy
+      PidFile dummy
+      StrictModes no
+      UsePAM no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      AuthorizedKeysFile .ssh/authorized_keys
+      PermitRootLogin no
+      X11Forwarding no
+      PrintMotd no
+      AcceptEnv LANG LC_*
+      Subsystem sftp internal-sftp
+SSHDCFG
+      # Start sshd with absolute path (sshd refuses to run without it).
       SSHD_BIN="${pkgs.openssh}/bin/sshd"
-      "$SSHD_BIN" -p ${toString cfg.sshPort} -D \
+      "$SSHD_BIN" -f "$SSHD_CFG" -p ${toString cfg.sshPort} -D \
         -o "HostKey=$SSH_KEY_DIR/ssh_host_ed25519_key" \
-        -o "PidFile=$SSH_KEY_DIR/sshd.pid" \
-        -o "StrictModes=no"
+        -o "PidFile=$SSH_KEY_DIR/sshd.pid"
     '';
 
     enterShell = ''

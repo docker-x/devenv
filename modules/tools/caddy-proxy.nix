@@ -33,9 +33,8 @@ in
         admin :${toString cfg.adminPort}
       }
       :${toString cfg.listenPort} {
-        reverse_proxy /* {
-          dynamic_suffix
-        }
+        # Proxy to common dev server ports — try each in order
+        reverse_proxy 127.0.0.1:3000 127.0.0.1:5173 127.0.0.1:8081
       }
 CADDYEOF
 )

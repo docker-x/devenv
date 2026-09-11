@@ -31,7 +31,10 @@ in
       pkgs.shadow
     ];
 
-    env.HOME = lib.mkForce "$HOME";
+    # Do not override HOME — let the container runtime / cdk8s construct
+    # set it (e.g. /env for OpenShift PVC-backed workspaces).
+    # env.HOME was previously set to "$HOME" (literal), which broke
+    # every path that relied on $HOME expansion.
 
     processes.sshd.exec = ''
       # Generate host keys in a writable location (OpenShift restricted SCC
@@ -40,6 +43,7 @@ in
       mkdir -p "$SSH_KEY_DIR"
       if [[ ! -f "$SSH_KEY_DIR/ssh_host_ed25519_key" ]]; then
         ssh-keygen -t ed25519 -f "$SSH_KEY_DIR/ssh_host_ed25519_key" -N "" 2>/dev/null || true
+        chmod 600 "$SSH_KEY_DIR/ssh_host_ed25519_key"
       fi
       # Minimal sshd_config — /etc/ssh/sshd_config doesn't exist in the container.
       SSHD_CFG="$SSH_KEY_DIR/sshd_config"

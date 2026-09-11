@@ -28,7 +28,7 @@ in
     packages = [ pkgs.caddy ];
 
     processes.caddy-proxy.exec = ''
-      caddy run --config <(echo '{
+      caddy run --adapter caddyfile --config <(echo '{
         admin :${toString cfg.adminPort}
         :${toString cfg.listenPort} {
           reverse_proxy /* {

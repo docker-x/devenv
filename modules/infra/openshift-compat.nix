@@ -41,8 +41,10 @@ in
       if [[ ! -f "$SSH_KEY_DIR/ssh_host_ed25519_key" ]]; then
         ssh-keygen -t ed25519 -f "$SSH_KEY_DIR/ssh_host_ed25519_key" -N "" 2>/dev/null || true
       fi
-      # Start sshd on the configured port with the generated host key
-      sshd -p ${toString cfg.sshPort} -D \
+      # Start sshd on the configured port with the generated host key.
+      # Use absolute path — sshd refuses to run without it.
+      SSHD_BIN="${pkgs.openssh}/bin/sshd"
+      "$SSHD_BIN" -p ${toString cfg.sshPort} -D \
         -o "HostKey=$SSH_KEY_DIR/ssh_host_ed25519_key" \
         -o "PidFile=$SSH_KEY_DIR/sshd.pid" \
         -o "StrictModes=no"

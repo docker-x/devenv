@@ -34,13 +34,18 @@ in
     env.HOME = lib.mkForce "$HOME";
 
     processes.sshd.exec = ''
-      # Generate host keys if missing
-      if [[ ! -d /etc/ssh ]]; then
-        mkdir -p /etc/ssh
-        ssh-keygen -A 2>/dev/null || true
+      # Generate host keys in a writable location (OpenShift restricted SCC
+      # prevents writing to /etc/ssh). Use HOME (PVC-backed) so keys persist.
+      SSH_KEY_DIR="''${HOME:-/tmp}/.ssh-host-keys"
+      mkdir -p "$SSH_KEY_DIR"
+      if [[ ! -f "$SSH_KEY_DIR/ssh_host_ed25519_key" ]]; then
+        ssh-keygen -t ed25519 -f "$SSH_KEY_DIR/ssh_host_ed25519_key" -N "" 2>/dev/null || true
       fi
-      # Start sshd on the configured port
-      sshd -p ${toString cfg.sshPort} -D
+      # Start sshd on the configured port with the generated host key
+      sshd -p ${toString cfg.sshPort} -D \
+        -o "HostKey=$SSH_KEY_DIR/ssh_host_ed25519_key" \
+        -o "PidFile=$SSH_KEY_DIR/sshd.pid" \
+        -o "StrictModes=no"
     '';
 
     enterShell = ''

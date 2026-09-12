@@ -65,6 +65,9 @@
     ./modules/tools/sacp-conductor.nix
     ./modules/tools/caddy-proxy.nix
     ./modules/tools/paseo.nix
+    ./modules/tools/mcp-servers.nix
+    ./modules/tools/codacy.nix
+    ./modules/tools/sonar.nix
 
     # --- infra: platform infrastructure ---
     ./modules/infra/openshift-compat.nix

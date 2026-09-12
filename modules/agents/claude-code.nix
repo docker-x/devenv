@@ -38,8 +38,11 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Delegate to native devenv Claude Code integration
+    # Delegate to native devenv Claude Code integration (settings, hooks,
+    # commands). NOTE: native claude.code does NOT install the CLI — the
+    # nixpkgs claude-code package provides the `claude` binary.
     claude.code.enable = true;
+    packages = [ pkgs.claude-code ];
 
     # Ensure agent-config is enabled when shareConfig is on
     dx.core.agentConfig.enable = lib.mkIf cfg.shareConfig true;

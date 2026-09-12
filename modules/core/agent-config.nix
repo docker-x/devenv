@@ -35,9 +35,13 @@ in
     env.AGENT_CONFIG_DIR = toString cfg.dir;
 
     enterShell = ''
-      # dx.core.agent-config: ensure shared config directory exists
-      mkdir -p "${toString cfg.dir}"
-      chmod 755 "${toString cfg.dir}" 2>/dev/null || true
+      # dx.core.agent-config: ensure shared config directory exists.
+      # env.AGENT_CONFIG_DIR holds the literal string "$HOME/..." — env vars
+      # are not shell-expanded — so normalize it before use and re-export the
+      # resolved path for downstream hooks.
+      export AGENT_CONFIG_DIR="$(eval echo "${toString cfg.dir}")"
+      mkdir -p "$AGENT_CONFIG_DIR"
+      chmod 755 "$AGENT_CONFIG_DIR" 2>/dev/null || true
     '';
   };
 }

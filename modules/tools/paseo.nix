@@ -121,7 +121,7 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="1"
+      PASEO_PATCH_VERSION="2"
       PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
@@ -258,7 +258,7 @@ function serializeInlineScriptJson(value) {
 }
 function injectConnectionHint(html, req, label) {
     const host = typeof req.headers.host === "string" ? req.headers.host : "";
-    const useTls = req.protocol === "https";
+    const useTls = true; // OpenShift Route always terminates TLS
     const defaultPort = useTls ? 443 : 80;
     const hostWithPort = host.includes(":") ? host : host + ":" + defaultPort;
     const hint = { listen: hostWithPort, useTls, label };

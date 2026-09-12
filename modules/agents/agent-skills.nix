@@ -53,8 +53,10 @@ in
     packages = [ pkgs.gh pkgs.jq ];
 
     enterShell = ''
-      # dx.agents.agent-skills: sync skills on first login
-      _SKILLS_DIR="''${AGENT_CONFIG_DIR:-$HOME/.local/share/agent-config}/skills"
+      # dx.agents.agent-skills: sync skills on first login.
+      # AGENT_CONFIG_DIR may hold a literal "$HOME/..." (env vars are not
+      # shell-expanded) — normalize via eval echo before use.
+      _SKILLS_DIR="$(eval echo "''${AGENT_CONFIG_DIR:-$HOME/.local/share/agent-config}")/skills"
       mkdir -p "$_SKILLS_DIR"
 
       ${lib.concatMapStrings (repo: ''

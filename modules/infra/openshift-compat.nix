@@ -46,7 +46,7 @@ in
       fi
       # Generate host keys in a writable location (OpenShift restricted SCC
       # prevents writing to /etc/ssh). Use HOME (PVC-backed) so keys persist.
-      # Group-writable (770/640): fsGroup shares the PVC across random UIDs —
+      # Group-writable dir (770): fsGroup shares the PVC across random UIDs —
       # a chmod-700 dir owned by a previous pod UID would break sshd on
       # restart. If the dir isn't writable by us, fall back to an ephemeral
       # mktemp dir (host key rotates) rather than crash.
@@ -58,13 +58,28 @@ in
       fi
       chmod 770 "$SSH_KEY_DIR" 2>/dev/null || true
       SSH_KEY="$SSH_KEY_DIR/ssh_host_ed25519_key"
-      if [[ ! -r "$SSH_KEY" ]]; then
+      # OpenSSH requires private keys be owner-only (& 0077 == 0) regardless
+      # of StrictModes — a group-readable key is rejected on load. A key left
+      # by a previous pod UID can't be chmod'd by us — the group-writable dir
+      # lets us remove and regenerate it instead. Symlinks are rejected first:
+      # the dir is group-writable, so a peer pod could point this path at an
+      # unrelated file and trick us into chmod'ing it.
+      if [[ -L "$SSH_KEY" ]]; then
+        echo "sshd: $SSH_KEY is a symlink — regenerating" >&2
         rm -f "$SSH_KEY" "$SSH_KEY.pub"
+      elif [[ -f "$SSH_KEY" ]] && ! chmod 600 "$SSH_KEY" 2>/dev/null; then
+        echo "sshd: $SSH_KEY owned by another UID — regenerating" >&2
+        rm -f "$SSH_KEY" "$SSH_KEY.pub"
+      fi
+      # A readable non-regular object (dir, fifo, dangling symlink) at the
+      # key path must not bypass regeneration — sshd would fail to load it.
+      if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]]; then
+        rm -rf "$SSH_KEY"; rm -f "$SSH_KEY.pub"
         if ! ssh-keygen -t ed25519 -f "$SSH_KEY" -N ""; then
           echo "sshd: failed to generate host key in $SSH_KEY_DIR" >&2
           exit 1
         fi
-        chmod 640 "$SSH_KEY"
+        chmod 600 "$SSH_KEY"
       fi
       # Minimal sshd_config — /etc/ssh/sshd_config doesn't exist in the container.
       # StrictModes stays off: it rejects group-writable homes, and the

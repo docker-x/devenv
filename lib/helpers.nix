@@ -40,6 +40,8 @@ let
       # execs it through the nix dynamic loader.
       ldsoWrapper ? false
     }:
+    assert lib.assertMsg (!(autoPatchelf && ldsoWrapper))
+      "mkGithubBinary ${pname}: autoPatchelf and ldsoWrapper are mutually exclusive — patchelfing before wrapping defeats the wrapper's purpose";
     let
       # GitHub release URL format:
       #   Pinned:  /releases/download/${version}/${asset}

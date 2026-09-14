@@ -44,12 +44,6 @@ in
         echo "sshd: HOME='$HOME' is unset, '/', or not writable — refusing to start (host keys need a persistent writable dir)" >&2
         exit 1
       fi
-      # Generate host keys in a writable location (OpenShift restricted SCC
-      # prevents writing to /etc/ssh). Use HOME (PVC-backed) so keys persist.
-      # Group-writable dir (770): fsGroup shares the PVC across random UIDs —
-      # a chmod-700 dir owned by a previous pod UID would break sshd on
-      # restart. If the dir isn't writable by us, fall back to an ephemeral
-      # mktemp dir (host key rotates) rather than crash.
       # Wire the mounted authorized_keys secret into place. The cdk8s chart
       # mounts it read-only at /ssh-keys/; sshd reads $HOME/.ssh/authorized_keys.
       # Symlink (not copy) so secret rotation propagates without a restart.
@@ -57,6 +51,31 @@ in
         mkdir -p "$HOME/.ssh" 2>/dev/null || true
         ln -sfn /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys"
       fi
+      # Remap the login user ('user') to the runtime UID/GID. OpenShift SCC
+      # assigns a random UID, and a non-root sshd can only serve logins for
+      # the UID it runs as — without the remap, `ssh user@` targets uid 1000
+      # and fails setuid. /etc/passwd is group-writable (gid 0); awk→cat
+      # rewrites in place because sed -i can't create temp files in /etc.
+      RUNTIME_UID=$(id -u); RUNTIME_GID=$(id -g)
+      if [[ "$RUNTIME_UID" != "0" && "$RUNTIME_UID" != "1000" ]]; then
+        chmod g+w /etc/passwd /etc/group 2>/dev/null || true
+        if [[ -w /etc/passwd ]]; then
+          awk -F: -v uid="$RUNTIME_UID" -v gid="$RUNTIME_GID" \
+            'BEGIN{OFS=":"} $1=="user"{$3=uid;$4=gid} {print}' \
+            /etc/passwd > /tmp/passwd.new \
+            && cat /tmp/passwd.new > /etc/passwd && rm -f /tmp/passwd.new
+          awk -F: -v gid="$RUNTIME_GID" \
+            'BEGIN{OFS=":"} $1=="user"{$3=gid} {print}' \
+            /etc/group > /tmp/group.new \
+            && cat /tmp/group.new > /etc/group && rm -f /tmp/group.new
+        fi
+      fi
+      # Generate host keys in a writable location (OpenShift restricted SCC
+      # prevents writing to /etc/ssh). Use HOME (PVC-backed) so keys persist.
+      # Group-writable dir (770): fsGroup shares the PVC across random UIDs —
+      # a chmod-700 dir owned by a previous pod UID would break sshd on
+      # restart. If the dir isn't writable by us, fall back to an ephemeral
+      # mktemp dir (host key rotates) rather than crash.
       SSH_KEY_DIR="$HOME/.ssh-host-keys"
       mkdir -p "$SSH_KEY_DIR" 2>/dev/null || true
       if [[ ! -d "$SSH_KEY_DIR" || ! -w "$SSH_KEY_DIR" ]]; then

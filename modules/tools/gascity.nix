@@ -83,6 +83,8 @@ in
         repo = "beads";
         asset = "beads_${beadsVersion}_linux_${goarch}.tar.gz";
         sha256 = hashes.beads.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
+        # bd ships dynamically linked (CGO) — rewrite ELF interpreter
+        autoPatchelf = true;
       })
       (helpers.mkGithubBinary {
         pname = "dolt";

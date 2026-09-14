@@ -30,6 +30,7 @@ in
       pkgs.openssh
       pkgs.shadow
       pkgs.nss_wrapper
+      pkgs.gawk
     ];
 
     # Do not override HOME — let the container runtime / cdk8s construct
@@ -50,7 +51,7 @@ in
       # Symlink (not copy) so secret rotation propagates without a restart.
       if [[ -f /ssh-keys/authorized_keys ]]; then
         mkdir -p "$HOME/.ssh" \
-          && ln -sfn /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys" \
+          && ln -sfnT /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys" \
           || { echo "sshd: failed to link authorized_keys into $HOME/.ssh" >&2; exit 1; }
       fi
       # Map the login user ('user') to the runtime UID/GID. OpenShift SCC

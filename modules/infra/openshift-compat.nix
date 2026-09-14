@@ -66,8 +66,10 @@ in
         echo "sshd: $SSH_KEY owned by another UID — regenerating" >&2
         rm -f "$SSH_KEY" "$SSH_KEY.pub"
       fi
-      if [[ ! -r "$SSH_KEY" ]]; then
-        rm -f "$SSH_KEY" "$SSH_KEY.pub"
+      # A readable non-regular object (dir, fifo, dangling symlink) at the
+      # key path must not bypass regeneration — sshd would fail to load it.
+      if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]]; then
+        rm -rf "$SSH_KEY"; rm -f "$SSH_KEY.pub"
         if ! ssh-keygen -t ed25519 -f "$SSH_KEY" -N ""; then
           echo "sshd: failed to generate host key in $SSH_KEY_DIR" >&2
           exit 1

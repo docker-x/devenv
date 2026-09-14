@@ -58,11 +58,16 @@ in
       fi
       chmod 770 "$SSH_KEY_DIR" 2>/dev/null || true
       SSH_KEY="$SSH_KEY_DIR/ssh_host_ed25519_key"
-      # OpenSSH ALWAYS rejects private keys with group/other bits (the 0660
-      # check is independent of StrictModes). A key left by a previous pod
-      # UID can't be chmod'd by us — the group-writable dir lets us remove
-      # and regenerate it instead.
-      if [[ -f "$SSH_KEY" ]] && ! chmod 600 "$SSH_KEY" 2>/dev/null; then
+      # OpenSSH requires private keys be owner-only (& 0077 == 0) regardless
+      # of StrictModes — a group-readable key is rejected on load. A key left
+      # by a previous pod UID can't be chmod'd by us — the group-writable dir
+      # lets us remove and regenerate it instead. Symlinks are rejected first:
+      # the dir is group-writable, so a peer pod could point this path at an
+      # unrelated file and trick us into chmod'ing it.
+      if [[ -L "$SSH_KEY" ]]; then
+        echo "sshd: $SSH_KEY is a symlink — regenerating" >&2
+        rm -f "$SSH_KEY" "$SSH_KEY.pub"
+      elif [[ -f "$SSH_KEY" ]] && ! chmod 600 "$SSH_KEY" 2>/dev/null; then
         echo "sshd: $SSH_KEY owned by another UID — regenerating" >&2
         rm -f "$SSH_KEY" "$SSH_KEY.pub"
       fi

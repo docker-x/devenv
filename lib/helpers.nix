@@ -28,6 +28,11 @@ let
     , asset
     , sha256 ? lib.fakeHash
     , postInstall ? ""
+    , # Set true for dynamically-linked binaries (e.g. CGO-enabled Go
+      # releases) — rewrites the ELF interpreter to the nix glibc and
+      # adds an rpath for libgcc/libstdc++. Implemented via explicit
+      # patchelf (not autoPatchelfHook) so it works on any build host.
+      autoPatchelf ? false
     }:
     let
       # GitHub release URL format:
@@ -36,9 +41,20 @@ let
       versionPath = if version == "latest" then "latest/download" else "download/${version}";
       isArchive = builtins.match ".*\\.(tar\\.(gz|bz2|xz)|tgz|zip)$" asset != null;
       isZip = builtins.match ".*\\.zip$" asset != null;
+      ldso = "${pkgs.stdenv.cc.libc}/lib/" + ({
+        x86_64-linux = "ld-linux-x86-64.so.2";
+        aarch64-linux = "ld-linux-aarch64.so.1";
+      }.${pkgs.stdenv.hostPlatform.system}
+        or (throw "mkGithubBinary: autoPatchelf unsupported on ${pkgs.stdenv.hostPlatform.system}"));
     in
     pkgs.stdenv.mkDerivation {
-      inherit pname version postInstall;
+      inherit pname version;
+
+      postInstall = postInstall + lib.optionalString autoPatchelf ''
+        patchelf --set-interpreter "${ldso}" \
+          --set-rpath "${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}" \
+          "$out/bin/${pname}"
+      '';
 
       src = pkgs.fetchurl {
         url = "https://github.com/${owner}/${repo}/releases/${versionPath}/${asset}";
@@ -49,7 +65,8 @@ let
       dontUnpack = true;
       dontBuild = true;
 
-      nativeBuildInputs = lib.optional isArchive pkgs.unzip;
+      nativeBuildInputs = lib.optional isArchive pkgs.unzip
+        ++ lib.optional autoPatchelf pkgs.patchelf;
 
       installPhase = ''
         runHook preInstall

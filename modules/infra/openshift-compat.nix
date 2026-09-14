@@ -62,9 +62,9 @@ in
       RUNTIME_UID=$(id -u); RUNTIME_GID=$(id -g)
       NSS_PASSWD=$(mktemp); NSS_GROUP=$(mktemp)
       SHELL_BIN="${pkgs.bashInteractive}/bin/bash"
-      awk -F: -v uid="$RUNTIME_UID" -v gid="$RUNTIME_GID" -v sh="$SHELL_BIN" '
+      awk -F: -v uid="$RUNTIME_UID" -v gid="$RUNTIME_GID" -v sh="$SHELL_BIN" -v home="$HOME" '
         BEGIN { OFS=":" }
-        $1 == "user"          { $3 = uid; $4 = gid; $7 = sh }
+        $1 == "user"          { $3 = uid; $4 = gid; $6 = home; $7 = sh }
         $3 == uid && $7 ~ /nologin/ { $7 = sh }
         { print }
       ' /etc/passwd > "$NSS_PASSWD"

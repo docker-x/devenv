@@ -50,6 +50,13 @@ in
       # a chmod-700 dir owned by a previous pod UID would break sshd on
       # restart. If the dir isn't writable by us, fall back to an ephemeral
       # mktemp dir (host key rotates) rather than crash.
+      # Wire the mounted authorized_keys secret into place. The cdk8s chart
+      # mounts it read-only at /ssh-keys/; sshd reads $HOME/.ssh/authorized_keys.
+      # Symlink (not copy) so secret rotation propagates without a restart.
+      if [[ -f /ssh-keys/authorized_keys ]]; then
+        mkdir -p "$HOME/.ssh" 2>/dev/null || true
+        ln -sfn /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys"
+      fi
       SSH_KEY_DIR="$HOME/.ssh-host-keys"
       mkdir -p "$SSH_KEY_DIR" 2>/dev/null || true
       if [[ ! -d "$SSH_KEY_DIR" || ! -w "$SSH_KEY_DIR" ]]; then

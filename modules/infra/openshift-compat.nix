@@ -49,8 +49,9 @@ in
       # mounts it read-only at /ssh-keys/; sshd reads $HOME/.ssh/authorized_keys.
       # Symlink (not copy) so secret rotation propagates without a restart.
       if [[ -f /ssh-keys/authorized_keys ]]; then
-        mkdir -p "$HOME/.ssh" 2>/dev/null || true
-        ln -sfn /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys"
+        mkdir -p "$HOME/.ssh" \
+          && ln -sfn /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys" \
+          || { echo "sshd: failed to link authorized_keys into $HOME/.ssh" >&2; exit 1; }
       fi
       # Map the login user ('user') to the runtime UID/GID. OpenShift SCC
       # assigns a random UID, and a non-root sshd can only serve logins for

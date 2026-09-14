@@ -46,12 +46,25 @@ in
       fi
       # Generate host keys in a writable location (OpenShift restricted SCC
       # prevents writing to /etc/ssh). Use HOME (PVC-backed) so keys persist.
+      # Group-writable (770/640): fsGroup shares the PVC across random UIDs —
+      # a chmod-700 dir owned by a previous pod UID would break sshd on
+      # restart. If the dir isn't writable by us, fall back to an ephemeral
+      # mktemp dir (host key rotates) rather than crash.
       SSH_KEY_DIR="$HOME/.ssh-host-keys"
-      mkdir -p "$SSH_KEY_DIR"
-      chmod 700 "$SSH_KEY_DIR"
-      if [[ ! -f "$SSH_KEY_DIR/ssh_host_ed25519_key" ]]; then
-        ssh-keygen -t ed25519 -f "$SSH_KEY_DIR/ssh_host_ed25519_key" -N "" 2>/dev/null || true
-        chmod 600 "$SSH_KEY_DIR/ssh_host_ed25519_key"
+      mkdir -p "$SSH_KEY_DIR" 2>/dev/null || true
+      if [[ ! -d "$SSH_KEY_DIR" || ! -w "$SSH_KEY_DIR" ]]; then
+        echo "sshd: $SSH_KEY_DIR not writable (prior pod UID owns it) — using ephemeral key dir" >&2
+        SSH_KEY_DIR=$(mktemp -d)
+      fi
+      chmod 770 "$SSH_KEY_DIR" 2>/dev/null || true
+      SSH_KEY="$SSH_KEY_DIR/ssh_host_ed25519_key"
+      if [[ ! -r "$SSH_KEY" ]]; then
+        rm -f "$SSH_KEY" "$SSH_KEY.pub"
+        if ! ssh-keygen -t ed25519 -f "$SSH_KEY" -N ""; then
+          echo "sshd: failed to generate host key in $SSH_KEY_DIR" >&2
+          exit 1
+        fi
+        chmod 640 "$SSH_KEY"
       fi
       # Minimal sshd_config — /etc/ssh/sshd_config doesn't exist in the container.
       # StrictModes stays off: it rejects group-writable homes, and the

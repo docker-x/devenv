@@ -83,8 +83,10 @@ in
         repo = "beads";
         asset = "beads_${beadsVersion}_linux_${goarch}.tar.gz";
         sha256 = hashes.beads.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
-        # bd ships dynamically linked (CGO) — rewrite ELF interpreter
-        autoPatchelf = true;
+        # bd is a CGO Go binary — patchelf rewrites ELF program headers and
+        # the Go runtime segfaults re-reading them. Run it through the nix
+        # dynamic loader via a wrapper instead (docker-x/devenv#22).
+        ldsoWrapper = true;
       })
       (helpers.mkGithubBinary {
         pname = "dolt";

@@ -29,6 +29,7 @@ in
     packages = [
       pkgs.openssh
       pkgs.shadow
+      pkgs.nss_wrapper
     ];
 
     # Do not override HOME — let the container runtime / cdk8s construct
@@ -44,6 +45,36 @@ in
         echo "sshd: HOME='$HOME' is unset, '/', or not writable — refusing to start (host keys need a persistent writable dir)" >&2
         exit 1
       fi
+      # Wire the mounted authorized_keys secret into place. The cdk8s chart
+      # mounts it read-only at /ssh-keys/; sshd reads $HOME/.ssh/authorized_keys.
+      # Symlink (not copy) so secret rotation propagates without a restart.
+      if [[ -f /ssh-keys/authorized_keys ]]; then
+        mkdir -p "$HOME/.ssh" \
+          && ln -sfn /ssh-keys/authorized_keys "$HOME/.ssh/authorized_keys" \
+          || { echo "sshd: failed to link authorized_keys into $HOME/.ssh" >&2; exit 1; }
+      fi
+      # Map the login user ('user') to the runtime UID/GID. OpenShift SCC
+      # assigns a random UID, and a non-root sshd can only serve logins for
+      # the UID it runs as — without the remap, `ssh user@` targets uid 1000
+      # and fails setuid. /etc/passwd is a read-only CRI-O bind-mount, so use
+      # nss_wrapper (LD_PRELOAD) with a rewritten copy — also fixes the
+      # SCC-injected nologin shell on the runtime-UID entry.
+      RUNTIME_UID=$(id -u); RUNTIME_GID=$(id -g)
+      NSS_PASSWD=$(mktemp); NSS_GROUP=$(mktemp)
+      SHELL_BIN="${pkgs.bashInteractive}/bin/bash"
+      awk -F: -v uid="$RUNTIME_UID" -v gid="$RUNTIME_GID" -v sh="$SHELL_BIN" -v home="$HOME" '
+        BEGIN { OFS=":" }
+        $1 == "user"          { $3 = uid; $4 = gid; $6 = home; $7 = sh }
+        $3 == uid && $7 ~ /nologin/ { $7 = sh }
+        { print }
+      ' /etc/passwd > "$NSS_PASSWD"
+      awk -F: -v gid="$RUNTIME_GID" '
+        BEGIN { OFS=":" }
+        $1 == "user" { $3 = gid }
+        { print }
+      ' /etc/group > "$NSS_GROUP"
+      export NSS_WRAPPER_PASSWD="$NSS_PASSWD" NSS_WRAPPER_GROUP="$NSS_GROUP"
+      export LD_PRELOAD="${pkgs.nss_wrapper}/lib/libnss_wrapper.so''${LD_PRELOAD:+:$LD_PRELOAD}"
       # Generate host keys in a writable location (OpenShift restricted SCC
       # prevents writing to /etc/ssh). Use HOME (PVC-backed) so keys persist.
       # Group-writable dir (770): fsGroup shares the PVC across random UIDs —

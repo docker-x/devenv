@@ -52,7 +52,7 @@ let
 
       postInstall = postInstall + lib.optionalString autoPatchelf ''
         patchelf --set-interpreter "${ldso}" \
-          --set-rpath "${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}" \
+          --set-rpath "${lib.makeLibraryPath [ pkgs.stdenv.cc.libc pkgs.stdenv.cc.cc.lib ]}" \
           "$out/bin/${pname}"
       '';
 
@@ -65,7 +65,8 @@ let
       dontUnpack = true;
       dontBuild = true;
 
-      nativeBuildInputs = lib.optional isArchive pkgs.unzip
+      # tar/gzip/xz come from stdenv; only .zip archives need unzip.
+      nativeBuildInputs = lib.optional isZip pkgs.unzip
         ++ lib.optional autoPatchelf pkgs.patchelf;
 
       installPhase = ''

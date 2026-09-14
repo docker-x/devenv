@@ -6,3 +6,10 @@
 inputs:
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
+
+# Repo-local evaluation (CI test.yaml enables dx.agents.claudeCode, which
+# pulls the unfree claude-code package). Downstream consumers set their own
+# permit in their devenv.yaml — this only affects this repo's eval.
+nixpkgs:
+  permitted_unfree_packages:
+    - claude-code

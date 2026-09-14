@@ -33,6 +33,12 @@ let
       # adds an rpath for libgcc/libstdc++. Implemented via explicit
       # patchelf (not autoPatchelfHook) so it works on any build host.
       autoPatchelf ? false
+    , # Alternative to autoPatchelf for binaries that break when patchelf
+      # rewrites their program headers (notably Go/CGO binaries — the Go
+      # runtime re-reads its own ELF headers and segfaults). Keeps the
+      # binary untouched in libexec/ and installs a bin/ wrapper that
+      # execs it through the nix dynamic loader.
+      ldsoWrapper ? false
     }:
     let
       # GitHub release URL format:
@@ -54,6 +60,14 @@ let
         patchelf --set-interpreter "${ldso}" \
           --set-rpath "${lib.makeLibraryPath [ pkgs.stdenv.cc.libc pkgs.stdenv.cc.cc.lib ]}" \
           "$out/bin/${pname}"
+      '' + lib.optionalString ldsoWrapper ''
+        mkdir -p "$out/libexec"
+        mv "$out/bin/${pname}" "$out/libexec/${pname}"
+        cat > "$out/bin/${pname}" <<WRAPPER
+#!/bin/sh
+exec "${ldso}" --library-path "${lib.makeLibraryPath [ pkgs.stdenv.cc.libc pkgs.stdenv.cc.cc.lib ]}" "$out/libexec/${pname}" "\$@"
+WRAPPER
+        chmod +x "$out/bin/${pname}"
       '';
 
       src = pkgs.fetchurl {

@@ -5,6 +5,26 @@
 devenv.sh module library migrating `docker-x/devcontainers` features to native
 devenv Nix modules. Consumed by downstream projects via `devenv.yaml` inputs.
 
+## Boundary: shared public library vs private config
+
+This repo is **public** and consumed by many downstream projects. Its private
+counterpart — `theplenkov-infra/devenv` — is where personal configuration
+lives and where these modules get personal values via options.
+
+Hard rules for everything committed here:
+
+- **No personal identifiers or configuration.** Never hardcode personal
+  GitHub orgs/usernames, cluster names, registry namespaces, hostnames, SSH
+  key names, credentials, or user-specific paths. Anything that differs per
+  deployment must be an option with a generic default (or no default).
+- **Every component is for general, configurable use.** A module that only
+  works for one specific deployment is a bug. Parameterize via `options.dx.*`
+  and helper args — not hardcoded strings.
+- **If you need a personal value, you need an option.** Add the option here,
+  set the value in the private config repo — never the reverse.
+
+Review policy: see `REVIEW.md`. The boundary rule is a blocking finding.
+
 ## Repo layout
 
 ```

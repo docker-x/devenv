@@ -104,6 +104,7 @@ devenv shell
 | `gascity` | Gas City — AI agent orchestration | `gascity` |
 | `homebrew` | Homebrew on Linux | `homebrew` |
 | `playwright` | Playwright browser deps | `playwright` |
+| `chromium` | Headless Chromium baked into the image (no runtime download) | `chromium`, `chromium-headless` |
 | `sacpConductor` | ACP proxy orchestration | `sacp-conductor` |
 | `caddyProxy` | Caddy reverse proxy for dev previews | `caddy-proxy` |
 | `paseo` | Paseo CLI | `paseo` |

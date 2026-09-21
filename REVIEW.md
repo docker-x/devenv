@@ -52,4 +52,7 @@ Mirror `.github/workflows/test.yaml` — the CI gate:
   eval misses). CI enables a fixed set of four modules — when touching a
   module outside that set, verify it locally with `devenv.local.nix` and
   note the coverage gap in the PR.
+
+Policy, not enforced by CI:
+
 - `lib.fakeHash` must not remain in code intended for a tagged release.

@@ -7,9 +7,8 @@ devenv Nix modules. Consumed by downstream projects via `devenv.yaml` inputs.
 
 ## Boundary: shared public library vs private config
 
-This repo is **public** and consumed by many downstream projects. Its private
-counterpart — `theplenkov-infra/devenv` — is where personal configuration
-lives and where these modules get personal values via options.
+This repo is **public** and consumed by many downstream projects. Personal
+configuration lives in each consumer's own private config repo — never here.
 
 Hard rules for everything committed here:
 
@@ -21,7 +20,7 @@ Hard rules for everything committed here:
   works for one specific deployment is a bug. Parameterize via `options.dx.*`
   and helper args — not hardcoded strings.
 - **If you need a personal value, you need an option.** Add the option here,
-  set the value in the private config repo — never the reverse.
+  set the value in your private config repo — never the reverse.
 
 Review policy: see `REVIEW.md`. The boundary rule is a blocking finding.
 

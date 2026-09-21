@@ -19,8 +19,9 @@ Reject any change that hardcodes personal identifiers or configuration:
 
 If a module needs such a value, the correct shape is a `dx.*` option with a
 generic default (or a required option with no default). Personal values are
-set downstream in the private config repo (`theplenkov-infra/devenv`), never
-here.
+set downstream in each consumer's private config repo — never here. This
+applies to docs too: `AGENTS.md`/`REVIEW.md`/`examples/` must not name a
+specific private repo or org; use generic phrasing.
 
 ## Generality rule (blocking)
 
@@ -46,6 +47,9 @@ Mirror `.github/workflows/test.yaml` — the CI gate:
 
 - `nix-instantiate --parse` on every `.nix` file (syntax).
 - `devenv info` — base evaluation.
-- `devenv info` again with a `devenv.local.nix` enabling the touched modules
-  (catches broken derivations and option-type errors that base eval misses).
+- `devenv info` again with a `devenv.local.nix` enabling a representative
+  module set (catches broken derivations and option-type errors that base
+  eval misses). CI enables a fixed set of four modules — when touching a
+  module outside that set, verify it locally with `devenv.local.nix` and
+  note the coverage gap in the PR.
 - `lib.fakeHash` must not remain in code intended for a tagged release.

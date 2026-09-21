@@ -8,10 +8,10 @@ personalized.
 
 Reject any change that hardcodes personal identifiers or configuration:
 
-- Personal GitHub orgs/usernames, e.g. `theplenkov*`, personal GHCR
-  namespaces. (The repo's own `docker-x` publish namespace is fine as a
-  default only when it is genuinely the shared namespace — not as an
-  identity baked into option-free code.)
+- Personal GitHub orgs/usernames or personal GHCR namespaces. (The repo's
+  own `docker-x` publish namespace is fine as a default only when it is
+  genuinely the shared namespace — not as an identity baked into
+  option-free code.)
 - Personal cluster names, kube contexts, hostnames, domains, registry URLs.
 - Personal SSH key names, pod/workspace names, user-specific paths
   (`/home/<user>/...`, `~/.ssh/<personal-key>`).
@@ -27,8 +27,9 @@ specific private repo or org; use generic phrasing.
 
 - A module that only works for one specific deployment is a defect.
   Parameterize the varying parts; keep defaults deployment-neutral.
-- New options must be declared under `dx.<category>.<id>.*` via
-  `lib/helpers.nix` helpers (`mkAgentOptions` / `extraOptions`), matching the
+- New options must live under `dx.<category>.<id>.*`. Agent modules use the
+  `lib/helpers.nix` helpers (`mkAgentOptions` / `extraOptions`); other
+  categories declare `options.dx.<category>.<id>.*` directly — matching the
   module structure in `AGENTS.md`.
 - `examples/` must also be generic — no personal values in examples.
 

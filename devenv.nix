@@ -62,6 +62,7 @@
     ./modules/tools/gascity.nix
     ./modules/tools/homebrew.nix
     ./modules/tools/playwright.nix
+    ./modules/tools/chromium.nix
     ./modules/tools/sacp-conductor.nix
     ./modules/tools/caddy-proxy.nix
     ./modules/tools/paseo.nix

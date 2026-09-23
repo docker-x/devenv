@@ -16,7 +16,12 @@ in
     version = lib.mkOption {
       type = lib.types.str;
       default = "latest";
-      description = "Version of Paseo CLI to install.";
+      description = ''
+        Version of Paseo CLI to install. "latest" resolves the newest
+        release on every invocation; pin an exact version (e.g. "0.9.0")
+        for a deterministic build — the npx wrapper then fetches that
+        tag once and serves it from the npx cache afterwards.
+      '';
     };
 
     enableRelay = lib.mkOption {
@@ -38,7 +43,6 @@ in
         pname = "paseo";
         npmName = "@getpaseo/cli";
         version = cfg.version;
-        sha256 = lib.fakeHash;
       })
     ];
 

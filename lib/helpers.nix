@@ -130,8 +130,11 @@ WRAPPER
   # ---------------------------------------------------------------------------
   # mkNpmCli — build a global npm CLI package.
   #
-  # Uses buildNpmPackage when a lockfile is available, otherwise falls back
-  # to a simple nodejs-based derivation that runs `npm install --prefix`.
+  # Produces a thin wrapper at $out/bin/<pname> that delegates to
+  # `npx --yes <npmName>@<version>` at runtime — a build-time npm install
+  # cannot run inside the nix sandbox (no network). "latest" tracks the
+  # newest release; a pinned version resolves the exact tag and is then
+  # served from the npx cache (~/.npm/_npx).
   #
   # Example:
   #   mkNpmCli {
@@ -166,7 +169,7 @@ WRAPPER
         mkdir -p $out/bin
         cat > $out/bin/${pname} << 'WRAPPER'
 #!/bin/sh
-exec ${pkgs.nodejs}/bin/npx --yes ${npmName}@${version} "$@"
+exec ${pkgs.nodejs}/bin/npx --yes '${npmName}@${version}' "$@"
 WRAPPER
         chmod +x $out/bin/${pname}
         runHook postInstall

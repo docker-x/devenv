@@ -132,9 +132,9 @@ WRAPPER
   #
   # Produces a thin wrapper at $out/bin/<pname> that delegates to
   # `npx --yes <npmName>@<version>` at runtime — a build-time npm install
-  # cannot run inside the nix sandbox (no network). "latest" tracks the
-  # newest release; a pinned version resolves the exact tag and is then
-  # served from the npx cache (~/.npm/_npx).
+  # cannot run inside the nix sandbox (no network). "latest" re-resolves
+  # the tag against the registry on each run (subject to npm's cache TTL);
+  # a pinned version resolves the exact tag — deterministic.
   #
   # Example:
   #   mkNpmCli {

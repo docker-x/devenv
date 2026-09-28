@@ -56,7 +56,10 @@ in
           lib.concatMapStringsSep "\n" (shim: ''
             cat > $out/bin/${shim} << 'WRAPPER'
 #!/bin/sh
-exec ${pkgs.nodejs}/bin/npx --yes --package 'socket@${cfg.version}' ${shim} "$@"
+# --prefer-offline: the shims wrap every package-manager call — serve the
+# pinned tag from the npx cache instead of paying a registry round-trip
+# per invocation (and breaking offline installs on a cold cache).
+exec ${pkgs.nodejs}/bin/npx --yes --prefer-offline --package 'socket@${cfg.version}' ${shim} "$@"
 WRAPPER
             chmod +x $out/bin/${shim}
           '') pmShims

@@ -21,8 +21,10 @@ let
   wrapper = pkgs.writeShellScriptBin "chromium-headless" ''
     exec ${cfg.package}/bin/chromium \
       --headless=new \
+      --user-data-dir="${cfg.userDataDir}" \
       ${lib.optionalString cfg.noSandbox "--no-sandbox --disable-setuid-sandbox"} \
-      ${lib.optionalString cfg.softwareRendering "--disable-gpu-sandbox --use-angle=swiftshader --enable-unsafe-swiftshader"} \
+      ${lib.optionalString cfg.softwareRendering "--use-angle=swiftshader --enable-unsafe-swiftshader"} \
+      ${lib.optionalString (cfg.softwareRendering && cfg.noSandbox) "--disable-gpu-sandbox"} \
       --disable-dev-shm-usage \
       "$@"
   '';
@@ -52,7 +54,23 @@ in
     softwareRendering = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Render through SwiftShader, for nodes without a GPU.";
+      description = ''
+        Render through SwiftShader, for nodes without a GPU. When noSandbox is
+        also set, --disable-gpu-sandbox is added because the GPU-process
+        sandbox cannot start either; with noSandbox = false the flag is left
+        off so the GPU-process sandbox stays intact.
+      '';
+    };
+
+    userDataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "\${XDG_RUNTIME_DIR:-/tmp}/chromium-profile";
+      defaultText = lib.literalExpression ''"''${XDG_RUNTIME_DIR:-/tmp}/chromium-profile"'';
+      description = ''
+        Profile directory passed as --user-data-dir. The default resolves at
+        runtime so the profile lands somewhere writable even when HOME is not
+        (restricted SCC can run with an arbitrary UID and unwritable HOME).
+      '';
     };
 
     setChromeEnv = lib.mkOption {

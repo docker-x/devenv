@@ -68,6 +68,7 @@
     ./modules/tools/mcp-servers.nix
     ./modules/tools/codacy.nix
     ./modules/tools/sonar.nix
+    ./modules/tools/socket.nix
 
     # --- infra: platform infrastructure ---
     ./modules/infra/openshift-compat.nix

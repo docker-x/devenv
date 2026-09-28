@@ -23,12 +23,15 @@ in
 
     version = lib.mkOption {
       type = lib.types.str;
-      default = "latest";
+      # Pinned by default: a security scanner floating on "latest" can
+      # change or weaken its install-time checks between invocations.
+      # Bump deliberately after checking the upstream changelog.
+      default = "1.2.1";
       description = ''
-        Version of the socket npm package. "latest" resolves the newest
-        release on every invocation; pin an exact version (e.g. "1.2.1")
-        for deterministic behavior — the npx wrapper then fetches that
-        tag once and serves it from the npx cache afterwards.
+        Version of the socket npm package. An exact tag (the default)
+        resolves once and is served from the npx cache afterwards;
+        "latest" re-resolves on every invocation — nondeterministic for
+        a security tool.
       '';
     };
 

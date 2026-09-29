@@ -105,8 +105,19 @@ in
       fi
       # A readable non-regular object (dir, fifo, dangling symlink) at the
       # key path must not bypass regeneration — sshd would fail to load it.
+      # Never rm -rf: the dir is group-writable, so a peer pod could plant a
+      # directory at the key path and recursive delete would wipe its
+      # contents. rmdir removes only an empty dir; a non-empty one fails safe.
       if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]]; then
-        rm -rf "$SSH_KEY"; rm -f "$SSH_KEY.pub"
+        if [[ -d "$SSH_KEY" && ! -L "$SSH_KEY" ]]; then
+          rmdir "$SSH_KEY" 2>/dev/null || {
+            echo "sshd: cannot remove non-empty key path $SSH_KEY" >&2
+            exit 1
+          }
+        else
+          rm -f "$SSH_KEY"
+        fi
+        rm -f "$SSH_KEY.pub"
         if ! ssh-keygen -t ed25519 -f "$SSH_KEY" -N ""; then
           echo "sshd: failed to generate host key in $SSH_KEY_DIR" >&2
           exit 1

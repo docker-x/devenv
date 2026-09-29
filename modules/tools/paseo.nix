@@ -50,7 +50,13 @@ in
     enableWebUi = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Serve the bundled web UI from the daemon.";
+      description = ''
+        Serve the bundled web UI from the daemon.
+        Exported as PASEO_WEB_UI_ENABLED, a per-launch override that takes
+        precedence over the shared per-HOME config.json — so two projects
+        with different settings each get their own value without
+        rewriting each other's config.
+      '';
     };
 
     forceTls = lib.mkOption {
@@ -105,22 +111,28 @@ in
     # for daemons launched from this shell instead.
     env.PASEO_RELAY_ENABLED = lib.boolToString cfg.enableRelay;
 
+    # Per-launch web UI override — same shared-config reasoning as
+    # PASEO_RELAY_ENABLED above.
+    env.PASEO_WEB_UI_ENABLED = lib.boolToString cfg.enableWebUi;
+
     enterShell = ''
       # dx.tools.paseo: ensure .paseo directory exists
       mkdir -p "$HOME/.paseo"
 
       # dx.tools.paseo: generate config.json if it doesn't exist or is outdated
-      # The config sets relay enablement, MCP injection, terminal agent
-      # hooks, and configures the Devin agent provider via ACP.
+      # The config sets relay enablement, web UI serving, MCP injection,
+      # terminal agent hooks, and configures the Devin agent provider via
+      # ACP.
       # Uses a version marker so config is regenerated when we update the
-      # template. relay.enabled here is only the fallback for launches
-      # outside a devenv shell — PASEO_RELAY_ENABLED (env above) is the
-      # authoritative per-project override. A stale or missing marker may
+      # template. relay.enabled and features.webUi.enabled here are only
+      # the fallback for launches outside a devenv shell —
+      # PASEO_RELAY_ENABLED/PASEO_WEB_UI_ENABLED (env above) are the
+      # authoritative per-project overrides. A stale or missing marker may
       # mean the existing config was customized by the user, so it is
       # preserved in a timestamped config.json.bak.* file rather than
       # silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      PASEO_CONFIG_VERSION="3"
+      PASEO_CONFIG_VERSION="4"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
@@ -198,6 +210,7 @@ in
     }
   },
   "features": {
+    "webUi": { "enabled": ${builtins.toJSON cfg.enableWebUi} },
     "dictation": { "enabled": false },
     "voiceMode": { "enabled": false }
   }

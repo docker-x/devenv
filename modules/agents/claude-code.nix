@@ -42,7 +42,15 @@ in
     # commands). NOTE: native claude.code does NOT install the CLI — the
     # nixpkgs claude-code package provides the `claude` binary.
     claude.code.enable = true;
-    packages = [ pkgs.claude-code ];
+    # "latest" uses the nixpkgs binary (no runtime network needed); a pinned
+    # version resolves through the mkNpmCli npx wrapper like other agents.
+    packages = [
+      (if cfg.version == "latest" then pkgs.claude-code else helpers.mkNpmCli {
+        pname = "claude";
+        npmName = "@anthropic-ai/claude-code";
+        version = cfg.version;
+      })
+    ];
 
     # Ensure agent-config is enabled when shareConfig is on
     dx.core.agentConfig.enable = lib.mkIf cfg.shareConfig true;

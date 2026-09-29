@@ -30,7 +30,8 @@ in
       description = ''
         Version of Claude Code to install. "latest" uses the bundled nixpkgs
         binary (offline, not necessarily the newest release); any other value
-        installs the exact npm version via npx.
+        is passed to npx as the npm specifier (e.g. "2.1.270" or a dist-tag
+        like "next").
       '';
     };
 

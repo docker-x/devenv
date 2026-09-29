@@ -55,8 +55,14 @@ in
     enterShell = ''
       # dx.agents.agent-skills: sync skills on first login.
       # AGENT_CONFIG_DIR may hold a literal "$HOME/..." (env vars are not
-      # shell-expanded) — normalize via eval echo before use.
-      _SKILLS_DIR="$(eval echo "''${AGENT_CONFIG_DIR:-$HOME/.local/share/agent-config}")/skills"
+      # shell-expanded) and derives from user-controllable cfg.dir — never
+      # eval it (command injection, CWE-78); resolve only a leading "$HOME",
+      # matching dx.core.agentConfig's normalization.
+      _SKILLS_DIR="''${AGENT_CONFIG_DIR:-$HOME/.local/share/agent-config}"
+      case "$_SKILLS_DIR" in
+        "\$HOME" | "\$HOME/"*) _SKILLS_DIR="$HOME''${_SKILLS_DIR#\$HOME}" ;;
+      esac
+      _SKILLS_DIR="$_SKILLS_DIR/skills"
       mkdir -p "$_SKILLS_DIR"
 
       ${lib.concatMapStrings (repo: ''

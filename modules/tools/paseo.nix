@@ -133,7 +133,10 @@ in
       # terminal agent hooks, and registers the Devin agent provider via
       # ACP when dx.agents.devin is enabled.
       # Uses a version marker so config is regenerated when we update the
-      # template. relay.enabled and features.webUi.enabled here are only
+      # template. The marker also carries the devin flag so projects
+      # sharing ~/.paseo with different dx.agents.devin settings
+      # regenerate instead of keeping a stale provider entry.
+      # relay.enabled and features.webUi.enabled here are only
       # the fallback for launches outside a devenv shell —
       # PASEO_RELAY_ENABLED/PASEO_WEB_UI_ENABLED (env above) are the
       # authoritative per-project overrides. A stale or missing marker may
@@ -141,7 +144,7 @@ in
       # preserved in a timestamped config.json.bak.* file rather than
       # silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      PASEO_CONFIG_VERSION="5"
+      PASEO_CONFIG_VERSION="5-${lib.boolToString (config.dx.agents.devin.enable or false)}"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")

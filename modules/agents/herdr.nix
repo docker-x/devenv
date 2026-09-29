@@ -18,10 +18,14 @@ let
     aarch64-linux = "aarch64";
   }.${pkgs.stdenv.hostPlatform.system} or (throw "dx.agents.herdr: unsupported system ${pkgs.stdenv.hostPlatform.system}");
 
-  # sha256 of the v0.9.0 release assets (from GitHub API asset digests)
+  # sha256 of release assets (from GitHub API asset digests), keyed by
+  # release tag. Versions without an entry fall back to lib.fakeHash so a
+  # bump surfaces the standard fill-in-the-hash flow, not a stale hash.
   hashes = {
-    x86_64-linux = "4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f";
-    aarch64-linux = "9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2";
+    "v0.9.0" = {
+      x86_64-linux = "4fa1a01158dd8043da92d31b270780b0dcc10603038d9b61cac4d81ab63fb71f";
+      aarch64-linux = "9c8db20fb7e7427b138d5367113f1621ffd319f2f65d6f009e2594029115f0d2";
+    };
   };
 in
 {
@@ -47,7 +51,7 @@ in
         owner = "herdrdev";
         repo = "herdr";
         asset = "herdr-linux-${assetSuffix}";
-        sha256 = hashes.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
+        sha256 = hashes.${cfg.version}.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
       })
     ];
 

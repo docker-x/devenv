@@ -27,6 +27,10 @@ in
         Path to the shared agent config directory. All agent modules with
         `shareConfig = true` will symlink their config into subdirectories
         of this path.
+
+        Only a leading `$HOME` is expanded at shell entry — `~` and other
+        variables are used literally (matching shareConfig hooks, which
+        expand `$HOME` in this value through double-quoted paths).
       '';
     };
   };
@@ -37,9 +41,14 @@ in
     enterShell = ''
       # dx.core.agent-config: ensure shared config directory exists.
       # env.AGENT_CONFIG_DIR holds the literal string "$HOME/..." — env vars
-      # are not shell-expanded — so normalize it before use and re-export the
-      # resolved path for downstream hooks.
-      export AGENT_CONFIG_DIR="$(eval echo "${toString cfg.dir}")"
+      # are not shell-expanded. cfg.dir is user-controllable, so quote it via
+      # escapeShellArg (never eval — command injection) and resolve only a
+      # leading "$HOME" — matching shareConfigHook, which expands "$HOME"
+      # in cfg.dir through double-quoted paths.
+      export AGENT_CONFIG_DIR=${lib.escapeShellArg cfg.dir}
+      case "$AGENT_CONFIG_DIR" in
+        "\$HOME" | "\$HOME/"*) AGENT_CONFIG_DIR="$HOME''${AGENT_CONFIG_DIR#\$HOME}" ;;
+      esac
       mkdir -p "$AGENT_CONFIG_DIR"
       chmod 755 "$AGENT_CONFIG_DIR" 2>/dev/null || true
     '';

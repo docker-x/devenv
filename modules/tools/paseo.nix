@@ -182,9 +182,7 @@ PASEOEOF
       PASEO_PATCHED_FILE="$HOME/.paseo/web-ui-patched-${paseoPatchId}.js"
       if [ ! -f "$PASEO_PATCHED_FILE" ]; then
         # Write via unique temp + atomic mv so concurrent enterShell runs and
-        # a racing paseo import never see a partially-written file. Stale
-        # temps from interrupted runs are swept first.
-        rm -f "$PASEO_PATCHED_FILE.tmp."*
+        # a racing paseo import never see a partially-written file.
         cat > "$PASEO_PATCHED_FILE.tmp.$$" << 'WUIEOF'
 import { createReadStream, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -376,13 +374,12 @@ WUIEOF
       # rather than falling back to a shared path that could carry
       # another project's hint policy. Rewritten only when missing or
       # still on an older loader revision.
-      PASEO_LOADER_VERSION="3"
+      PASEO_LOADER_VERSION="4"
       PASEO_LOADER_FILE="$HOME/.paseo/web-ui-loader.mjs"
       PASEO_LOADER_VERSION_FILE="$HOME/.paseo/.web-ui-loader-version"
       CURRENT_LOADER_VERSION=""
       [ -f "$PASEO_LOADER_VERSION_FILE" ] && CURRENT_LOADER_VERSION=$(cat "$PASEO_LOADER_VERSION_FILE" 2>/dev/null || echo "")
       if [ ! -f "$PASEO_LOADER_FILE" ] || [ "$CURRENT_LOADER_VERSION" != "$PASEO_LOADER_VERSION" ]; then
-        rm -f "$PASEO_LOADER_FILE.tmp."*
         cat > "$PASEO_LOADER_FILE.tmp.$$" << 'LOADEREOF'
 import { existsSync } from "node:fs";
 export async function resolve(specifier, context, nextResolve) {
@@ -399,7 +396,7 @@ export async function resolve(specifier, context, nextResolve) {
 function expandHome(p) {
   const home = process.env.HOME || "";
   if (p === "~" || p.startsWith("~/") || p === "$HOME" || p.startsWith("$HOME/")) {
-    if (!home) { throw new Error("PASEO_WEB_UI_PATCH: HOME is unset — cannot expand " + p); }
+    if (!home) { return p; }
     return home + p.replace(/^(~|\$HOME)/, "");
   }
   return p;
@@ -409,6 +406,11 @@ LOADEREOF
           echo "$PASEO_LOADER_VERSION" > "$PASEO_LOADER_VERSION_FILE"
         fi
       fi
+
+      # dx.tools.paseo: sweep temp files orphaned by interrupted runs.
+      # Age-gated — a blanket glob sweep could unlink a concurrent
+      # enterShell's in-progress temp and make its mv fail.
+      find "$HOME/.paseo" -maxdepth 1 -name 'web-ui-*.tmp.*' -mmin +1 -delete 2>/dev/null || true
     '';
   };
 }

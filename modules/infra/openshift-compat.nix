@@ -105,12 +105,44 @@ in
       fi
       # A readable non-regular object (dir, fifo, dangling symlink) at the
       # key path must not bypass regeneration — sshd would fail to load it.
-      if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]]; then
-        rm -rf "$SSH_KEY"; rm -f "$SSH_KEY.pub"
-        if ! ssh-keygen -t ed25519 -f "$SSH_KEY" -N ""; then
+      # Never rm -rf: the dir is group-writable, so a peer pod could plant a
+      # directory at the key path and recursive delete would wipe its
+      # contents. rmdir removes only an empty dir; a non-empty one fails
+      # safe. The .pub path gets the same treatment — a planted dir there
+      # would make ssh-keygen fail. A key that passes -f/-r but is torn or
+      # corrupt (crash mid-copy, partial PVC write) would brick sshd on
+      # load, so ssh-keygen -y gates the keep path too. -P "" keeps a
+      # planted encrypted key from blocking on a passphrase prompt.
+      if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]] \
+        || ! ssh-keygen -P "" -y -f "$SSH_KEY" >/dev/null 2>&1; then
+        for p in "$SSH_KEY" "$SSH_KEY.pub"; do
+          if [[ -d "$p" && ! -L "$p" ]]; then
+            rmdir "$p" 2>/dev/null || {
+              echo "sshd: cannot remove non-empty key path $p" >&2
+              exit 1
+            }
+          else
+            rm -f "$p"
+          fi
+        done
+        # Keygen into a private staging dir under TMPDIR — container-local,
+        # so no fsGroup peer can rename it or plant a symlink at its path
+        # (a 0770 parent would let a peer swap a staged .gen.* dir out from
+        # under us before keygen opens it). mv -fT then installs the pair —
+        # a planted dest symlink is unlinked/replaced, never followed.
+        # Strays die with the pod's /tmp — nothing accumulates on the PVC.
+        GEN_DIR=$(mktemp -d) || {
+          echo "sshd: cannot create key staging dir" >&2
+          exit 1
+        }
+        if ! ssh-keygen -t ed25519 -f "$GEN_DIR/key" -N "" \
+          || ! mv -fT "$GEN_DIR/key" "$SSH_KEY" \
+          || ! mv -fT "$GEN_DIR/key.pub" "$SSH_KEY.pub"; then
+          rm -f "$GEN_DIR/key" "$GEN_DIR/key.pub"; rmdir "$GEN_DIR" 2>/dev/null
           echo "sshd: failed to generate host key in $SSH_KEY_DIR" >&2
           exit 1
         fi
+        rmdir "$GEN_DIR"
         chmod 600 "$SSH_KEY"
       fi
       # Minimal sshd_config — /etc/ssh/sshd_config doesn't exist in the container.

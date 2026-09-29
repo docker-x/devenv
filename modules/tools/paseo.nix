@@ -137,7 +137,7 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="5-${if cfg.forceTls then "tls" else "notls"}"
+      PASEO_PATCH_VERSION="6-${if cfg.forceTls then "tls" else "notls"}"
       PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
@@ -174,10 +174,18 @@ function getContentType(filePath) {
 }
 function selectEncoding(acceptEncoding) {
     if (!acceptEncoding) { return null; }
-    const normalized = acceptEncoding.toLowerCase();
-    if (normalized.includes("br")) { return "br"; }
-    if (normalized.includes("gzip")) { return "gzip"; }
-    return null;
+    const qualities = new Map();
+    for (const part of acceptEncoding.toLowerCase().split(",")) {
+        const [token, ...params] = part.split(";");
+        const qMatch = /(?:^|;)\s*q\s*=\s*([^\s;]*)/.exec(";" + params.join(";"));
+        const q = qMatch ? Number(qMatch[1]) : 1;
+        qualities.set(token.trim(), Number.isFinite(q) && q >= 0 && q <= 1 ? q : 0);
+    }
+    const wildcard = qualities.get("*") ?? 0;
+    const brQ = qualities.get("br") ?? wildcard;
+    const gzipQ = qualities.get("gzip") ?? wildcard;
+    if (brQ <= 0 && gzipQ <= 0) { return null; }
+    return brQ >= gzipQ ? "br" : "gzip";
 }
 function isHashedAsset(filePath) {
     const base = path.basename(filePath);

@@ -177,8 +177,9 @@ function selectEncoding(acceptEncoding) {
     const qualities = new Map();
     for (const part of acceptEncoding.toLowerCase().split(",")) {
         const [token, ...params] = part.split(";");
-        const qMatch = /(?:^|;)\s*q\s*=\s*(\d+(?:\.\d+)?)/.exec(";" + params.join(";"));
-        qualities.set(token.trim(), qMatch ? Math.min(parseFloat(qMatch[1]), 1) : 1);
+        const qMatch = /(?:^|;)\s*q\s*=\s*([^\s;]*)/.exec(";" + params.join(";"));
+        const q = qMatch ? Number(qMatch[1]) : 1;
+        qualities.set(token.trim(), Number.isFinite(q) && q >= 0 && q <= 1 ? q : 0);
     }
     const wildcard = qualities.get("*") ?? 0;
     const brQ = qualities.get("br") ?? wildcard;

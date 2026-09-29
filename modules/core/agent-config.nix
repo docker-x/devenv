@@ -27,6 +27,10 @@ in
         Path to the shared agent config directory. All agent modules with
         `shareConfig = true` will symlink their config into subdirectories
         of this path.
+
+        Only a leading `$HOME` is expanded at shell entry — `~` and other
+        variables are used literally (matching shareConfig hooks, which
+        expand `$HOME` in this value through double-quoted paths).
       '';
     };
   };

@@ -527,7 +527,9 @@ LOADEREOF
           *.bak.*) PASEO_AGE_OPT="-cmin" ;;
           *) PASEO_AGE_OPT="-mmin" ;;
         esac
-        [ -n "$(find "$PASEO_TMP" -maxdepth 0 "$PASEO_AGE_OPT" +60 2>/dev/null)" ] && rm -f "$PASEO_TMP"
+        # No -maxdepth needed: the [ -f ] guard guarantees a file
+        # starting point, and BSD find (macOS) lacks -maxdepth anyway.
+        [ -n "$(find "$PASEO_TMP" "$PASEO_AGE_OPT" +60 -print 2>/dev/null)" ] && rm -f "$PASEO_TMP"
       done
       unset PASEO_TMP PASEO_TMP_REAL PASEO_TMP_PID PASEO_AGE_OPT
     '';

@@ -102,18 +102,31 @@ in
       # and configures the Devin agent provider via ACP.
       # Uses a version marker so config is regenerated when we update the
       # template. A stale or missing marker may mean the existing config was
-      # customized by the user, so it is preserved at config.json.bak rather
-      # than silently overwritten.
+      # customized by the user, so it is preserved in a timestamped
+      # config.json.bak.* file rather than silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
       PASEO_CONFIG_VERSION="2"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
       if [ ! -f "$PASEO_CONFIG" ] || [ "$CURRENT_VERSION" != "$PASEO_CONFIG_VERSION" ]; then
-        if [ -f "$PASEO_CONFIG" ] && ! cp -p "$PASEO_CONFIG" "$PASEO_CONFIG.bak"; then
+        # Back up before regenerating: a fresh timestamped destination each
+        # run keeps every prior config (not just the last), the copy goes
+        # through a PID-unique temp + atomic mv so the .bak file is never
+        # observed partially written, and a destination already present as
+        # a directory or symlink is rejected rather than written into or
+        # through.
+        PASEO_BAK="$PASEO_CONFIG.bak.$(date +%Y%m%d%H%M%S)"
+        PASEO_BAK_TMP="$PASEO_BAK.tmp.$$"
+        if [ -f "$PASEO_CONFIG" ] && {
+          [ -e "$PASEO_BAK" ] || [ -L "$PASEO_BAK" ] ||
+          ! cp -p "$PASEO_CONFIG" "$PASEO_BAK_TMP" ||
+          ! mv -f "$PASEO_BAK_TMP" "$PASEO_BAK";
+        }; then
+          rm -f "$PASEO_BAK_TMP"
           echo "dx.tools.paseo: could not back up $PASEO_CONFIG; keeping existing config" >&2
         else
-          [ -f "$PASEO_CONFIG" ] && echo "dx.tools.paseo: previous config preserved at $PASEO_CONFIG.bak" >&2
+          [ -f "$PASEO_CONFIG" ] && echo "dx.tools.paseo: previous config preserved at $PASEO_BAK" >&2
           cat > "$PASEO_CONFIG" << 'PASEOEOF'
 {
   "version": 1,

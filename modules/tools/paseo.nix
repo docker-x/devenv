@@ -143,7 +143,10 @@ PASEOEOF
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
       if [ "$CURRENT_PATCH_VERSION" != "$PASEO_PATCH_VERSION" ]; then
         # Write via unique temp + atomic mv so concurrent enterShell runs and
-        # a racing paseo import never see a partially-written file.
+        # a racing paseo import never see a partially-written file. Stale
+        # temps from interrupted runs are swept first; the version marker is
+        # written only after both renames succeed.
+        rm -f "$HOME/.paseo/web-ui-patched.js.tmp."* "$HOME/.paseo/web-ui-loader.mjs.tmp."*
         cat > "$HOME/.paseo/web-ui-patched.js.tmp.$$" << 'WUIEOF'
 import { createReadStream, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -297,7 +300,6 @@ function injectConnectionHint(html, req, label) {
 }
 //# sourceMappingURL=web-ui.js.map
 WUIEOF
-        mv -f "$HOME/.paseo/web-ui-patched.js.tmp.$$" "$HOME/.paseo/web-ui-patched.js"
 
         cat > "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" << 'LOADEREOF'
 export async function resolve(specifier, context, nextResolve) {
@@ -308,9 +310,11 @@ export async function resolve(specifier, context, nextResolve) {
   return result;
 }
 LOADEREOF
-        mv -f "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" "$HOME/.paseo/web-ui-loader.mjs"
 
-        echo "$PASEO_PATCH_VERSION" > "$PASEO_PATCH_VERSION_FILE"
+        if mv -f "$HOME/.paseo/web-ui-patched.js.tmp.$$" "$HOME/.paseo/web-ui-patched.js" \
+           && mv -f "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" "$HOME/.paseo/web-ui-loader.mjs"; then
+          echo "$PASEO_PATCH_VERSION" > "$PASEO_PATCH_VERSION_FILE"
+        fi
       fi
     '';
   };

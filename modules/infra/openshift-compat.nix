@@ -121,10 +121,16 @@ in
             rm -f "$p"
           fi
         done
-        # Keygen into a private 700 dir we own, then mv into place — rename(2)
-        # atomically replaces whatever a peer may plant at the target (incl.
-        # a symlink) instead of following it, closing the cleanup→keygen race.
-        GEN_DIR=$(mktemp -d "$SSH_KEY_DIR/.gen.XXXXXX")
+        # Keygen into a private staging dir under TMPDIR — container-local,
+        # so no fsGroup peer can rename it or plant a symlink at its path
+        # (a 0770 parent would let a peer swap a staged .gen.* dir out from
+        # under us before keygen opens it). mv -fT then installs the pair —
+        # a planted dest symlink is unlinked/replaced, never followed.
+        # Strays die with the pod's /tmp — nothing accumulates on the PVC.
+        GEN_DIR=$(mktemp -d) || {
+          echo "sshd: cannot create key staging dir" >&2
+          exit 1
+        }
         if ! ssh-keygen -t ed25519 -f "$GEN_DIR/key" -N "" \
           || ! mv -fT "$GEN_DIR/key" "$SSH_KEY" \
           || ! mv -fT "$GEN_DIR/key.pub" "$SSH_KEY.pub"; then

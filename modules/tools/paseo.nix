@@ -449,7 +449,7 @@ LOADEREOF
       # enterShell's in-progress temp and make its mv fail. The 60-minute
       # horizon keeps the window unreachable for a stalled writer while
       # still sweeping orphans promptly.
-      find "$HOME/.paseo" -maxdepth 1 \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +60 -delete 2>/dev/null || true
+      find "$HOME/.paseo" -maxdepth 1 \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' -o -name 'config.json.bak.*.tmp.*' \) -mmin +60 -delete 2>/dev/null || true
     '';
   };
 }

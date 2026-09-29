@@ -91,23 +91,45 @@ let
         HEADER="$header" BARE_HEADER="$bare_header" \
           PREFIX="$prefix" BARE_PREFIX="$bare_prefix" \
           awk '
+          BEGIN { dq = 0; sq = 0; ml = ""; pending = 0 }
+          function cut_comment(s,   i, c) {
+            for (i = 1; i <= length(s); i++) {
+              c = substr(s, i, 1)
+              if (ml != "") {
+                if (substr(s, i, 3) == ml) { ml = ""; i += 2 }
+                continue
+              }
+              if (dq == 0 && sq == 0 && substr(s, i, 3) == "\"\"\"") { ml = "\"\"\""; i += 2; continue }
+              if (dq == 0 && sq == 0 && substr(s, i, 3) == "\047\047\047") { ml = "\047\047\047"; i += 2; continue }
+              if (dq && c == "\\") { i++; continue }
+              if (c == "\"" && sq == 0) { dq = !dq; continue }
+              if (c == "\047" && dq == 0) { sq = !sq; continue }
+              if (c == "#" && dq == 0 && sq == 0) return substr(s, 1, i - 1)
+            }
+            return s
+          }
           {
-            line = $0
-            sub(/#.*$/, "", line)
+            in_str = (ml != "")
+            line = cut_comment($0)
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
-            if (substr(line, 1, 1) == "[") {
+            if (!in_str && substr(line, 1, 1) == "[") {
+              p = index(line, ENVIRON["PREFIX"])
+              q = index(line, ENVIRON["BARE_PREFIX"])
               skip = (line == ENVIRON["HEADER"] ||
                 (ENVIRON["BARE_HEADER"] != "" && line == ENVIRON["BARE_HEADER"]) ||
-                index(line, ENVIRON["PREFIX"]) == 1 ||
-                (ENVIRON["BARE_PREFIX"] != "" && index(line, ENVIRON["BARE_PREFIX"]) == 1))
+                p == 1 || p == 2 ||
+                (ENVIRON["BARE_PREFIX"] != "" && (q == 1 || q == 2)))
             }
-            if (!skip) print
+            if (!skip) {
+              if ($0 ~ /^[[:space:]]*$/) { pending++ }
+              else { for (i = 0; i < pending; i++) print ""; pending = 0; print }
+            }
           }
         ' "$config_file" > "$tmp_file"
         chmod "$old_mode" "$tmp_file"
 
         {
-          echo ""
+          if [ -s "$tmp_file" ]; then echo ""; fi
           echo "[mcp_servers.$toml_key]"
           if [ "$has_url" = "true" ]; then
             echo "$entry_json" | jq -r '"url = " + (.url | @json)'

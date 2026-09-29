@@ -371,10 +371,12 @@ WUIEOF
       # The loader is config-free and shared by all projects: it forwards
       # paseo's web-ui module to $PASEO_WEB_UI_PATCH (set per project via
       # env above) and expands a leading "$HOME"/"~" so the literal env
-      # value resolves. The unhashed legacy path stays the fallback for
-      # daemons launched outside a devenv shell. Rewritten only when
-      # missing or still on an older loader revision.
-      PASEO_LOADER_VERSION="2"
+      # value resolves. It fails closed — when the var is unset or the
+      # file is absent, the upstream module passes through unpatched
+      # rather than falling back to a shared path that could carry
+      # another project's hint policy. Rewritten only when missing or
+      # still on an older loader revision.
+      PASEO_LOADER_VERSION="3"
       PASEO_LOADER_FILE="$HOME/.paseo/web-ui-loader.mjs"
       PASEO_LOADER_VERSION_FILE="$HOME/.paseo/.web-ui-loader-version"
       CURRENT_LOADER_VERSION=""
@@ -382,17 +384,24 @@ WUIEOF
       if [ ! -f "$PASEO_LOADER_FILE" ] || [ "$CURRENT_LOADER_VERSION" != "$PASEO_LOADER_VERSION" ]; then
         rm -f "$PASEO_LOADER_FILE.tmp."*
         cat > "$PASEO_LOADER_FILE.tmp.$$" << 'LOADEREOF'
+import { existsSync } from "node:fs";
 export async function resolve(specifier, context, nextResolve) {
   const result = await nextResolve(specifier, context);
   if (result.url && result.url.includes("server/server/web-ui.js") && result.url.includes("@getpaseo")) {
-    return { url: "file://" + expandHome(process.env.PASEO_WEB_UI_PATCH || "$HOME/.paseo/web-ui-patched.js"), shortCircuit: true };
+    const configured = process.env.PASEO_WEB_UI_PATCH;
+    if (!configured) { return result; }
+    const patched = expandHome(configured);
+    if (!existsSync(patched)) { return result; }
+    return { url: "file://" + patched, shortCircuit: true };
   }
   return result;
 }
 function expandHome(p) {
   const home = process.env.HOME || "";
-  if (p === "~" || p.startsWith("~/")) { return home + p.slice(1); }
-  if (p === "$HOME" || p.startsWith("$HOME/")) { return home + p.slice(5); }
+  if (p === "~" || p.startsWith("~/") || p === "$HOME" || p.startsWith("$HOME/")) {
+    if (!home) { throw new Error("PASEO_WEB_UI_PATCH: HOME is unset — cannot expand " + p); }
+    return home + p.replace(/^(~|\$HOME)/, "");
+  }
   return p;
 }
 LOADEREOF

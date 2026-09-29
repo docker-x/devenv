@@ -19,6 +19,15 @@ let
     forceTls = cfg.forceTls;
     allowedHosts = cfg.allowedHosts;
   }));
+
+  # The Devin ACP provider is only registered when this project also
+  # installs the Devin CLI (dx.agents.devin.enable); otherwise Paseo
+  # would advertise a provider whose executable is not on PATH, so it is
+  # emitted as disabled like the other non-installed providers.
+  devinProviderJson =
+    if config.dx.agents.devin.enable or false
+    then ''"devin": { "extends": "acp", "label": "Devin CLI", "description": "Cognition's Devin for Terminal via Agent Client Protocol", "command": ["devin", "acp"], "env": {} },''
+    else ''"devin": { "enabled": false },'';
 in
 {
   options.dx.tools.paseo = {
@@ -121,10 +130,13 @@ in
 
       # dx.tools.paseo: generate config.json if it doesn't exist or is outdated
       # The config sets relay enablement, web UI serving, MCP injection,
-      # terminal agent hooks, and configures the Devin agent provider via
-      # ACP.
+      # terminal agent hooks, and registers the Devin agent provider via
+      # ACP when dx.agents.devin is enabled.
       # Uses a version marker so config is regenerated when we update the
-      # template. relay.enabled and features.webUi.enabled here are only
+      # template. The marker also carries the devin flag so projects
+      # sharing ~/.paseo with different dx.agents.devin settings
+      # regenerate instead of keeping a stale provider entry.
+      # relay.enabled and features.webUi.enabled here are only
       # the fallback for launches outside a devenv shell —
       # PASEO_RELAY_ENABLED/PASEO_WEB_UI_ENABLED (env above) are the
       # authoritative per-project overrides. A stale or missing marker may
@@ -132,7 +144,7 @@ in
       # preserved in a timestamped config.json.bak.* file rather than
       # silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      PASEO_CONFIG_VERSION="4"
+      PASEO_CONFIG_VERSION="5-${lib.boolToString (config.dx.agents.devin.enable or false)}"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
@@ -192,13 +204,7 @@ in
   "plugins": {},
   "agents": {
     "providers": {
-      "devin": {
-        "extends": "acp",
-        "label": "Devin CLI",
-        "description": "Cognition's Devin for Terminal via Agent Client Protocol",
-        "command": ["devin", "acp"],
-        "env": {}
-      },
+      ${devinProviderJson}
       "pi": { "enabled": false },
       "opencode": { "enabled": false },
       "copilot": { "enabled": false },

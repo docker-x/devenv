@@ -51,12 +51,17 @@ in
         Enable Paseo relay for remote connections (app.paseo.sh).
         Exported as PASEO_RELAY_ENABLED, a per-launch override that takes
         precedence over config.json — so two projects with different
-        settings each get their own value. The generated config.json
-        deliberately omits daemon.relay.enabled: the file is shared
-        per-HOME, so any baked value would be an arbitrary pick across
-        projects. Daemons launched outside a devenv shell therefore get
-        the upstream default (currently enabled via a legacy-compat
-        fallback; export PASEO_RELAY_ENABLED manually to pin it).
+        settings each get their own value. The override only reaches
+        daemons that inherit this shell's environment, i.e. foreground
+        `paseo daemon run`; `paseo daemon start` launches in managed
+        mode and strips the PASEO_* daemon-setting variables, so a
+        managed daemon follows Paseo's managed configuration instead.
+        The generated config.json deliberately omits
+        daemon.relay.enabled: the file is shared per-HOME, so any baked
+        value would be an arbitrary pick across projects. Daemons
+        launched outside a devenv shell therefore get the upstream
+        default (currently enabled via a legacy-compat fallback; export
+        PASEO_RELAY_ENABLED manually to pin it for a foreground run).
       '';
     };
 
@@ -67,12 +72,17 @@ in
         Serve the bundled web UI from the daemon.
         Exported as PASEO_WEB_UI_ENABLED, a per-launch override that takes
         precedence over config.json — so two projects with different
-        settings each get their own value. The generated config.json
-        deliberately omits features.webUi.enabled: the file is shared
-        per-HOME, so any baked value would be an arbitrary pick across
-        projects. Daemons launched outside a devenv shell therefore get
-        the upstream default (disabled — fail closed; export
-        PASEO_WEB_UI_ENABLED manually to enable it).
+        settings each get their own value. The override only reaches
+        daemons that inherit this shell's environment, i.e. foreground
+        `paseo daemon run`; `paseo daemon start` launches in managed
+        mode and strips the PASEO_* daemon-setting variables, so a
+        managed daemon follows Paseo's managed configuration instead.
+        The generated config.json deliberately omits
+        features.webUi.enabled: the file is shared per-HOME, so any
+        baked value would be an arbitrary pick across projects.
+        Daemons launched outside a devenv shell therefore get the
+        upstream default (disabled — fail closed; export
+        PASEO_WEB_UI_ENABLED manually to enable it for a foreground run).
       '';
     };
 
@@ -126,12 +136,15 @@ in
     # it deliberately carries no daemon.relay.enabled fallback — a baked
     # value would be whichever project regenerated first, not this
     # project's setting. The env var is the only per-project channel and
-    # is authoritative for daemons launched from this shell; launches
-    # outside the shell get the upstream default.
+    # is authoritative for daemons that inherit this shell's environment
+    # — foreground `paseo daemon run`. Managed starts (`paseo daemon
+    # start`) strip the PASEO_* daemon-setting vars, so a managed daemon
+    # follows Paseo's managed configuration; launches outside the shell
+    # likewise get the upstream default.
     env.PASEO_RELAY_ENABLED = lib.boolToString cfg.enableRelay;
 
     # Per-launch web UI override — same shared-config reasoning as
-    # PASEO_RELAY_ENABLED above.
+    # PASEO_RELAY_ENABLED above, and the same managed-start caveat.
     env.PASEO_WEB_UI_ENABLED = lib.boolToString cfg.enableWebUi;
 
     enterShell = ''
@@ -150,8 +163,12 @@ in
       # absent: config.json is shared per-HOME, so a baked value would be
       # whichever project regenerated first — arbitrary across projects.
       # PASEO_RELAY_ENABLED/PASEO_WEB_UI_ENABLED (env above) are the
-      # per-project channel; launches outside a devenv shell get the
-      # upstream defaults (relay on via legacy compat, web UI off).
+      # per-project channel for daemons inheriting this shell's
+      # environment — i.e. foreground `paseo daemon run`. Managed starts
+      # (`paseo daemon start`) strip these daemon-setting vars, so a
+      # managed daemon follows Paseo's managed configuration; launches
+      # outside a devenv shell get the upstream defaults (relay on via
+      # legacy compat, web UI off).
       # A stale or missing marker may mean the existing config was
       # customized by the user, so it is preserved in a timestamped
       # config.json.bak.* file rather than silently overwritten.

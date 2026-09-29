@@ -110,11 +110,11 @@ in
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
       if [ ! -f "$PASEO_CONFIG" ] || [ "$CURRENT_VERSION" != "$PASEO_CONFIG_VERSION" ]; then
-        if [ -f "$PASEO_CONFIG" ]; then
-          cp -p "$PASEO_CONFIG" "$PASEO_CONFIG.bak" \
-            && echo "dx.tools.paseo: previous config preserved at $PASEO_CONFIG.bak" >&2
-        fi
-        cat > "$PASEO_CONFIG" << 'PASEOEOF'
+        if [ -f "$PASEO_CONFIG" ] && ! cp -p "$PASEO_CONFIG" "$PASEO_CONFIG.bak"; then
+          echo "dx.tools.paseo: could not back up $PASEO_CONFIG; keeping existing config" >&2
+        else
+          [ -f "$PASEO_CONFIG" ] && echo "dx.tools.paseo: previous config preserved at $PASEO_CONFIG.bak" >&2
+          cat > "$PASEO_CONFIG" << 'PASEOEOF'
 {
   "version": 1,
   "daemon": {
@@ -166,8 +166,9 @@ in
   }
 }
 PASEOEOF
-        chmod 600 "$PASEO_CONFIG"
-        echo "$PASEO_CONFIG_VERSION" > "$PASEO_VERSION_FILE"
+          chmod 600 "$PASEO_CONFIG"
+          echo "$PASEO_CONFIG_VERSION" > "$PASEO_VERSION_FILE"
+        fi
       fi
 
       # dx.tools.paseo: create workspace directory for projects

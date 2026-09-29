@@ -107,21 +107,32 @@ in
       # key path must not bypass regeneration — sshd would fail to load it.
       # Never rm -rf: the dir is group-writable, so a peer pod could plant a
       # directory at the key path and recursive delete would wipe its
-      # contents. rmdir removes only an empty dir; a non-empty one fails safe.
+      # contents. rmdir removes only an empty dir; a non-empty one fails
+      # safe. The .pub path gets the same treatment — a planted dir there
+      # would make ssh-keygen fail.
       if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]]; then
-        if [[ -d "$SSH_KEY" && ! -L "$SSH_KEY" ]]; then
-          rmdir "$SSH_KEY" 2>/dev/null || {
-            echo "sshd: cannot remove non-empty key path $SSH_KEY" >&2
-            exit 1
-          }
-        else
-          rm -f "$SSH_KEY"
-        fi
-        rm -f "$SSH_KEY.pub"
-        if ! ssh-keygen -t ed25519 -f "$SSH_KEY" -N ""; then
+        for p in "$SSH_KEY" "$SSH_KEY.pub"; do
+          if [[ -d "$p" && ! -L "$p" ]]; then
+            rmdir "$p" 2>/dev/null || {
+              echo "sshd: cannot remove non-empty key path $p" >&2
+              exit 1
+            }
+          else
+            rm -f "$p"
+          fi
+        done
+        # Keygen into a private 700 dir we own, then mv into place — rename(2)
+        # atomically replaces whatever a peer may plant at the target (incl.
+        # a symlink) instead of following it, closing the cleanup→keygen race.
+        GEN_DIR=$(mktemp -d "$SSH_KEY_DIR/.gen.XXXXXX")
+        if ! ssh-keygen -t ed25519 -f "$GEN_DIR/key" -N "" \
+          || ! mv -fT "$GEN_DIR/key" "$SSH_KEY" \
+          || ! mv -fT "$GEN_DIR/key.pub" "$SSH_KEY.pub"; then
+          rm -f "$GEN_DIR/key" "$GEN_DIR/key.pub"; rmdir "$GEN_DIR" 2>/dev/null
           echo "sshd: failed to generate host key in $SSH_KEY_DIR" >&2
           exit 1
         fi
+        rmdir "$GEN_DIR"
         chmod 600 "$SSH_KEY"
       fi
       # Minimal sshd_config — /etc/ssh/sshd_config doesn't exist in the container.

@@ -62,10 +62,8 @@ let
 
     merge_into_toml() {
       local config_file="$1" server_name="$2" entry_json="$3"
-      local has_url has_command toml_key lock_file="''${config_file}.lock"
+      local toml_key lock_file="''${config_file}.lock"
 
-      has_url=$(echo "$entry_json" | jq -r 'has("url")')
-      has_command=$(echo "$entry_json" | jq -r 'has("command")')
       toml_key=$(printf '%s' "$server_name" | jq -Rr '@json')
 
       mkdir -p "$(dirname "$config_file")"
@@ -131,14 +129,27 @@ let
         {
           if [ -s "$tmp_file" ]; then echo ""; fi
           echo "[mcp_servers.$toml_key]"
-          if [ "$has_url" = "true" ]; then
-            echo "$entry_json" | jq -r '"url = " + (.url | @json)'
-          fi
-          if [ "$has_command" = "true" ]; then
-            echo "$entry_json" | jq -r '"command = " + (.command | @json)'
-            echo "$entry_json" | jq -r 'if .args then "args = [" + ([.args[] | @json] | join(", ")) + "]" else empty end'
-            echo "$entry_json" | jq -r 'if .env then "env = { " + ([.env | to_entries[] | (.key | @json) + " = " + (.value | @json)] | join(", ")) + " }" else empty end' 2>/dev/null || true
-          fi
+          echo "$entry_json" | jq -r '
+            def toml_value:
+              if type == "object" then
+                "{ " + ([to_entries[] | select(.value != null)
+                  | (.key | @json) + " = " + (.value | toml_value)] | join(", ")) + " }"
+              elif type == "array" then
+                "[" + (map(toml_value) | join(", ")) + "]"
+              elif type == "string" then @json
+              else tostring end;
+            (if (.headers | type) == "object" then
+               .http_headers = (.headers + (.http_headers // {}))
+             else . end)
+            | ((if has("command")
+                then ["command", "args", "env", "env_vars", "cwd"]
+                else ["url", "bearer_token", "bearer_token_env_var", "http_headers", "env_http_headers"] end)
+               + ["enabled", "required", "startup_timeout_sec", "startup_timeout_ms",
+                  "tool_timeout_sec", "enabled_tools", "disabled_tools", "scopes"]) as $keys
+            | $keys[] as $k
+            | select(.[$k] != null)
+            | "\($k) = \(.[$k] | toml_value)"
+          '
         } >> "$tmp_file"
         mv "$tmp_file" "$config_file"
       ) 200>"$lock_file"
@@ -244,6 +255,9 @@ in
         Merged into each detected agent's native config on shell entry.
         Registry entries are authoritative: a same-named entry in the agent
         config is replaced, so registry changes propagate on the next run.
+        For Codex (config.toml) all fields supported by its transport schema
+        are written; `headers` maps to `http_headers` on url servers. Fields
+        Codex does not support for a transport are omitted.
       '';
       example = {
         deepwiki = { url = "https://mcp.deepwiki.com/mcp"; };

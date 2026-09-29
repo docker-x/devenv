@@ -98,14 +98,16 @@ in
       mkdir -p "$HOME/.paseo"
 
       # dx.tools.paseo: generate config.json if it doesn't exist or is outdated
-      # The config enables relay, MCP injection, terminal agent hooks,
-      # and configures the Devin agent provider via ACP.
+      # The config sets relay enablement, MCP injection, terminal agent
+      # hooks, and configures the Devin agent provider via ACP.
       # Uses a version marker so config is regenerated when we update the
-      # template. A stale or missing marker may mean the existing config was
-      # customized by the user, so it is preserved in a timestamped
-      # config.json.bak.* file rather than silently overwritten.
+      # template. The marker embeds the resolved enableRelay value so
+      # toggling the option regenerates an existing config too. A stale or
+      # missing marker may mean the existing config was customized by the
+      # user, so it is preserved in a timestamped config.json.bak.* file
+      # rather than silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      PASEO_CONFIG_VERSION="2"
+      PASEO_CONFIG_VERSION="3-relay=${if cfg.enableRelay then "on" else "off"}"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
@@ -155,7 +157,7 @@ in
       ]
     },
     "relay": {
-      "enabled": true
+      "enabled": ${builtins.toJSON cfg.enableRelay}
     }
   },
   "app": {

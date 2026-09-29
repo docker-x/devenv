@@ -152,7 +152,7 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="7-${if cfg.forceTls then "tls" else "notls"}-${builtins.substring 0 8 (builtins.hashString "sha256" (builtins.toJSON cfg.allowedHosts))}"
+      PASEO_PATCH_VERSION="8-${if cfg.forceTls then "tls" else "notls"}-${builtins.substring 0 8 (builtins.hashString "sha256" (builtins.toJSON cfg.allowedHosts))}"
       PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
@@ -313,7 +313,7 @@ function injectConnectionHint(html, req, label) {
         .map(h => h.trim().toLowerCase())
         .filter(Boolean);
     const requestHost = (typeof req.headers.host === "string" ? req.headers.host : "").trim().toLowerCase();
-    const requestHostname = requestHost.replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+    const requestHostname = requestHost.replace(/:\d+$/, "").replace(/^\[(.*)\]$/, "$1");
     if (allowedHosts.length > 0 && !allowedHosts.includes(requestHost) && !allowedHosts.includes(requestHostname)) {
         return html;
     }

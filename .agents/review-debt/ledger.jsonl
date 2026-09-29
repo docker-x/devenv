@@ -1,0 +1,15 @@
+{"thread_id":"PRRT_kwDOUTsXF86hadWK","status":"wontfix","fix_pr":null,"fixed_at":"2026-09-29T10:54:45.255Z","notes":"intentional: StrictModes off required for group-writable PVC HOME under fsGroup; compensated by PasswordAuthentication no + PermitRootLogin no (openshift-compat.nix:117-121)"}
+{"thread_id":"PRRT_kwDOUTsXF86hadWY","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:45.426Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hafJP","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:45.547Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hb0rD","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:45.801Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hblc7","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:45.676Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hbldH","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.900Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hbWFz","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.757Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hkMPn","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.333Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hkMPr","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.198Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hkOy6","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.458Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86hkOzA","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.602Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86iS73H","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:45.925Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86iS73N","status":"done","fix_pr":null,"fixed_at":"2026-09-29T10:54:46.058Z","notes":"verified obsolete on main (pre-triage while loop runs)"}
+{"thread_id":"PRRT_kwDOUTsXF86m4CME","status":"done","fix_pr":28,"fixed_at":"2026-09-29T09:40:26.453Z","notes":null}
+{"thread_id":"PRRT_kwDOUTsXF86m4CMO","status":"done","fix_pr":28,"fixed_at":"2026-09-29T09:40:26.601Z","notes":null}

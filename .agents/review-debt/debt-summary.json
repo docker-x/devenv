@@ -1,0 +1,18 @@
+{
+  "generated_at": "2026-09-29T10:54:46.945Z",
+  "open_count": 33,
+  "by_area": {
+    "modules/infra": 2,
+    "devenv.yaml": 1,
+    "modules/core": 2,
+    "modules/agents": 5,
+    "modules/tools": 23
+  },
+  "by_author": {
+    "cubic-dev-ai": 1,
+    "codeant-ai": 23,
+    "amazon-q-developer": 9
+  },
+  "duplicate_fingerprints": [],
+  "oldest_open": "2026-09-29T09:23:12.509Z"
+}

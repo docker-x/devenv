@@ -37,9 +37,14 @@ in
     enterShell = ''
       # dx.core.agent-config: ensure shared config directory exists.
       # env.AGENT_CONFIG_DIR holds the literal string "$HOME/..." — env vars
-      # are not shell-expanded — so normalize it before use and re-export the
-      # resolved path for downstream hooks.
-      export AGENT_CONFIG_DIR="$(eval echo "${toString cfg.dir}")"
+      # are not shell-expanded. cfg.dir is user-controllable, so quote it via
+      # escapeShellArg (never eval — command injection) and resolve only a
+      # leading "$HOME" or "~" before re-exporting the resolved path.
+      export AGENT_CONFIG_DIR=${lib.escapeShellArg cfg.dir}
+      case "$AGENT_CONFIG_DIR" in
+        "\$HOME" | "\$HOME/"*) AGENT_CONFIG_DIR="$HOME''${AGENT_CONFIG_DIR#\$HOME}" ;;
+        "~" | "~/"*) AGENT_CONFIG_DIR="$HOME''${AGENT_CONFIG_DIR#\~}" ;;
+      esac
       mkdir -p "$AGENT_CONFIG_DIR"
       chmod 755 "$AGENT_CONFIG_DIR" 2>/dev/null || true
     '';

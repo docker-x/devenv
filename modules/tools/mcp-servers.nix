@@ -135,7 +135,7 @@ let
                 "{ " + ([to_entries[] | select(.value != null)
                   | (.key | @json) + " = " + (.value | toml_value)] | join(", ")) + " }"
               elif type == "array" then
-                "[" + (map(toml_value) | join(", ")) + "]"
+                "[" + ([.[] | select(. != null) | toml_value] | join(", ")) + "]"
               elif type == "string" then @json
               else tostring end;
             (if (.headers | type) == "object" then

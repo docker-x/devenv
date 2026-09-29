@@ -73,10 +73,16 @@ in
         fi
       '') cfg.skills}
 
-      # Create per-agent symlinks (native skills dir per agent)
+      # Create per-agent symlinks (native skills dir per agent).
+      # ln -sfn into a real dir nests the link inside it instead of
+      # replacing it — back the dir up first (mirrors skills-sync.sh).
       ${lib.concatMapStrings (agent: ''
         _agent_skills="$HOME/${knownAgents.${agent} or ".${agent}/skills"}"
-        if [[ ! -L "$_agent_skills" ]]; then
+        if [[ -d "$_agent_skills" && ! -L "$_agent_skills" ]]; then
+          echo "dx.agents.agent-skills: backing up $_agent_skills -> ''${_agent_skills}.bak"
+          mv "$_agent_skills" "''${_agent_skills}.bak" 2>/dev/null || true
+        fi
+        if [[ ! -e "$_agent_skills" || -L "$_agent_skills" ]]; then
           mkdir -p "$(dirname "$_agent_skills")"
           ln -sfn "$_SKILLS_DIR" "$_agent_skills" 2>/dev/null || true
         fi

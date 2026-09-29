@@ -50,9 +50,13 @@ in
       description = ''
         Enable Paseo relay for remote connections (app.paseo.sh).
         Exported as PASEO_RELAY_ENABLED, a per-launch override that takes
-        precedence over the shared per-HOME config.json — so two projects
-        with different settings each get their own value without
-        rewriting each other's config.
+        precedence over config.json — so two projects with different
+        settings each get their own value. The generated config.json
+        deliberately omits daemon.relay.enabled: the file is shared
+        per-HOME, so any baked value would be an arbitrary pick across
+        projects. Daemons launched outside a devenv shell therefore get
+        the upstream default (currently enabled via a legacy-compat
+        fallback; export PASEO_RELAY_ENABLED manually to pin it).
       '';
     };
 
@@ -62,9 +66,13 @@ in
       description = ''
         Serve the bundled web UI from the daemon.
         Exported as PASEO_WEB_UI_ENABLED, a per-launch override that takes
-        precedence over the shared per-HOME config.json — so two projects
-        with different settings each get their own value without
-        rewriting each other's config.
+        precedence over config.json — so two projects with different
+        settings each get their own value. The generated config.json
+        deliberately omits features.webUi.enabled: the file is shared
+        per-HOME, so any baked value would be an arbitrary pick across
+        projects. Daemons launched outside a devenv shell therefore get
+        the upstream default (disabled — fail closed; export
+        PASEO_WEB_UI_ENABLED manually to enable it).
       '';
     };
 
@@ -115,9 +123,11 @@ in
     env.PASEO_WEB_UI_PATCH = "$HOME/.paseo/web-ui-patched-${paseoPatchId}.js";
 
     # Per-launch relay override. config.json is a shared per-HOME file, so
-    # baking enableRelay into it would make projects with different
-    # settings rewrite each other's config; the env var is authoritative
-    # for daemons launched from this shell instead.
+    # it deliberately carries no daemon.relay.enabled fallback — a baked
+    # value would be whichever project regenerated first, not this
+    # project's setting. The env var is the only per-project channel and
+    # is authoritative for daemons launched from this shell; launches
+    # outside the shell get the upstream default.
     env.PASEO_RELAY_ENABLED = lib.boolToString cfg.enableRelay;
 
     # Per-launch web UI override — same shared-config reasoning as
@@ -129,22 +139,24 @@ in
       mkdir -p "$HOME/.paseo"
 
       # dx.tools.paseo: generate config.json if it doesn't exist or is outdated
-      # The config sets relay enablement, web UI serving, MCP injection,
-      # terminal agent hooks, and registers the Devin agent provider via
-      # ACP when dx.agents.devin is enabled.
+      # The config sets the listen address, MCP injection, terminal agent
+      # hooks, and registers the Devin agent provider via ACP when
+      # dx.agents.devin is enabled.
       # Uses a version marker so config is regenerated when we update the
       # template. The marker also carries the devin flag so projects
       # sharing ~/.paseo with different dx.agents.devin settings
       # regenerate instead of keeping a stale provider entry.
-      # relay.enabled and features.webUi.enabled here are only
-      # the fallback for launches outside a devenv shell —
+      # daemon.relay.enabled and features.webUi.enabled are deliberately
+      # absent: config.json is shared per-HOME, so a baked value would be
+      # whichever project regenerated first — arbitrary across projects.
       # PASEO_RELAY_ENABLED/PASEO_WEB_UI_ENABLED (env above) are the
-      # authoritative per-project overrides. A stale or missing marker may
-      # mean the existing config was customized by the user, so it is
-      # preserved in a timestamped config.json.bak.* file rather than
-      # silently overwritten.
+      # per-project channel; launches outside a devenv shell get the
+      # upstream defaults (relay on via legacy compat, web UI off).
+      # A stale or missing marker may mean the existing config was
+      # customized by the user, so it is preserved in a timestamped
+      # config.json.bak.* file rather than silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      PASEO_CONFIG_VERSION="5-${lib.boolToString (config.dx.agents.devin.enable or false)}"
+      PASEO_CONFIG_VERSION="6-${lib.boolToString (config.dx.agents.devin.enable or false)}"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
@@ -192,9 +204,6 @@ in
       "allowedOrigins": [
         "https://app.paseo.sh"
       ]
-    },
-    "relay": {
-      "enabled": ${builtins.toJSON cfg.enableRelay}
     }
   },
   "app": {
@@ -216,7 +225,6 @@ in
     }
   },
   "features": {
-    "webUi": { "enabled": ${builtins.toJSON cfg.enableWebUi} },
     "dictation": { "enabled": false },
     "voiceMode": { "enabled": false }
   }

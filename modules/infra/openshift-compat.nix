@@ -19,9 +19,12 @@ in
     enable = lib.mkEnableOption "OpenShift restricted SCC compatibility";
 
     sshPort = lib.mkOption {
-      type = lib.types.port;
+      # Restricted SCC runs sshd as a random non-root UID with no
+      # CAP_NET_BIND_SERVICE — ports below 1024 can never bind, so reject
+      # them at eval time rather than letting sshd die at runtime.
+      type = lib.types.ints.between 1024 65535;
       default = 2222;
-      description = "Port for the SSH server.";
+      description = "Port for the SSH server (must be >= 1024; the process runs non-root).";
     };
   };
 

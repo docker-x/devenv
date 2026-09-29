@@ -127,7 +127,10 @@ in
           echo "dx.tools.paseo: could not back up $PASEO_CONFIG; keeping existing config" >&2
         else
           [ -f "$PASEO_CONFIG" ] && echo "dx.tools.paseo: previous config preserved at $PASEO_BAK" >&2
-          cat > "$PASEO_CONFIG" << 'PASEOEOF'
+          # Write via PID-unique temp + atomic mv so a concurrent reader
+          # never observes a truncated or interleaved config.json.
+          PASEO_CONFIG_TMP="$PASEO_CONFIG.tmp.$$"
+          cat > "$PASEO_CONFIG_TMP" << 'PASEOEOF'
 {
   "version": 1,
   "daemon": {
@@ -179,8 +182,14 @@ in
   }
 }
 PASEOEOF
-          chmod 600 "$PASEO_CONFIG"
-          echo "$PASEO_CONFIG_VERSION" > "$PASEO_VERSION_FILE"
+          # $? is cat's status — a failed heredoc must not rename a
+          # partial temp into place.
+          if [ $? -eq 0 ] && chmod 600 "$PASEO_CONFIG_TMP" && mv -f "$PASEO_CONFIG_TMP" "$PASEO_CONFIG"; then
+            echo "$PASEO_CONFIG_VERSION" > "$PASEO_VERSION_FILE"
+          else
+            rm -f "$PASEO_CONFIG_TMP"
+            echo "dx.tools.paseo: could not write $PASEO_CONFIG" >&2
+          fi
         fi
       fi
 
@@ -430,8 +439,10 @@ LOADEREOF
 
       # dx.tools.paseo: sweep temp files orphaned by interrupted runs.
       # Age-gated — a blanket glob sweep could unlink a concurrent
-      # enterShell's in-progress temp and make its mv fail.
-      find "$HOME/.paseo" -maxdepth 1 -name 'web-ui-*.tmp.*' -mmin +1 -delete 2>/dev/null || true
+      # enterShell's in-progress temp and make its mv fail. The 60-minute
+      # horizon keeps the window unreachable for a stalled writer while
+      # still sweeping orphans promptly.
+      find "$HOME/.paseo" -maxdepth 1 \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +60 -delete 2>/dev/null || true
     '';
   };
 }

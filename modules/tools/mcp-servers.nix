@@ -147,7 +147,7 @@ let
            else . end)
           | ((if .command != null
               then ["command", "args", "env", "env_vars", "cwd"]
-              else ["url", "bearer_token", "bearer_token_env_var", "http_headers", "env_http_headers"] end)
+              else ["url", "bearer_token_env_var", "http_headers", "env_http_headers"] end)
              + ["enabled", "required", "startup_timeout_sec", "startup_timeout_ms",
                 "tool_timeout_sec", "enabled_tools", "disabled_tools", "scopes"]) as $keys
           | $keys[] as $k
@@ -161,10 +161,10 @@ let
             echo "[mcp_servers.$toml_key]"
             echo "$serialized"
           } >> "$tmp_file"
+          mv "$tmp_file" "$config_file"
         else
           echo "configure-mcp: skipping $server_name: no serializable Codex fields" >&2
         fi
-        mv "$tmp_file" "$config_file"
       ) 200>"$lock_file"
     }
 

@@ -38,7 +38,13 @@ in
     enableRelay = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Enable Paseo relay for remote connections (app.paseo.sh).";
+      description = ''
+        Enable Paseo relay for remote connections (app.paseo.sh).
+        Exported as PASEO_RELAY_ENABLED, a per-launch override that takes
+        precedence over the shared per-HOME config.json — so two projects
+        with different settings each get their own value without
+        rewriting each other's config.
+      '';
     };
 
     enableWebUi = lib.mkOption {
@@ -93,6 +99,12 @@ in
     # ran enterShell.
     env.PASEO_WEB_UI_PATCH = "$HOME/.paseo/web-ui-patched-${paseoPatchId}.js";
 
+    # Per-launch relay override. config.json is a shared per-HOME file, so
+    # baking enableRelay into it would make projects with different
+    # settings rewrite each other's config; the env var is authoritative
+    # for daemons launched from this shell instead.
+    env.PASEO_RELAY_ENABLED = lib.boolToString cfg.enableRelay;
+
     enterShell = ''
       # dx.tools.paseo: ensure .paseo directory exists
       mkdir -p "$HOME/.paseo"
@@ -101,13 +113,14 @@ in
       # The config sets relay enablement, MCP injection, terminal agent
       # hooks, and configures the Devin agent provider via ACP.
       # Uses a version marker so config is regenerated when we update the
-      # template. The marker embeds the resolved enableRelay value so
-      # toggling the option regenerates an existing config too. A stale or
-      # missing marker may mean the existing config was customized by the
-      # user, so it is preserved in a timestamped config.json.bak.* file
-      # rather than silently overwritten.
+      # template. relay.enabled here is only the fallback for launches
+      # outside a devenv shell — PASEO_RELAY_ENABLED (env above) is the
+      # authoritative per-project override. A stale or missing marker may
+      # mean the existing config was customized by the user, so it is
+      # preserved in a timestamped config.json.bak.* file rather than
+      # silently overwritten.
       PASEO_CONFIG="$HOME/.paseo/config.json"
-      PASEO_CONFIG_VERSION="3-relay=${if cfg.enableRelay then "on" else "off"}"
+      PASEO_CONFIG_VERSION="3"
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")

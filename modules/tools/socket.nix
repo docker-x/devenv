@@ -43,7 +43,8 @@ in
         drop-in package-manager wrappers that scan dependencies during
         install. The wrappers exec the real npm/npx/pnpm/yarn from
         PATH, so the matching package manager must be available (e.g.
-        languages.javascript.enable); they only gate installs when
+        languages.javascript.npm.enable, .pnpm.enable, .yarn.enable);
+        they only gate installs when
         invoked directly or aliased (npm itself is not replaced).
         Disable for the bare `socket` command only.
       '';

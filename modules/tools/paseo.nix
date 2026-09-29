@@ -137,12 +137,17 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="4-${if cfg.forceTls then "tls" else "notls"}"
+      PASEO_PATCH_VERSION="5-${if cfg.forceTls then "tls" else "notls"}"
       PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
       if [ "$CURRENT_PATCH_VERSION" != "$PASEO_PATCH_VERSION" ]; then
-        cat > "$HOME/.paseo/web-ui-patched.js" << 'WUIEOF'
+        # Write via unique temp + atomic mv so concurrent enterShell runs and
+        # a racing paseo import never see a partially-written file. Stale
+        # temps from interrupted runs are swept first; the version marker is
+        # written only after both renames succeed.
+        rm -f "$HOME/.paseo/web-ui-patched.js.tmp."* "$HOME/.paseo/web-ui-loader.mjs.tmp."*
+        cat > "$HOME/.paseo/web-ui-patched.js.tmp.$$" << 'WUIEOF'
 import { createReadStream, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 const EXCLUDED_PATH_PREFIXES = ["/api/", "/mcp/", "/public/"];
@@ -290,13 +295,13 @@ function injectConnectionHint(html, req, label) {
     const hint = { listen: hostWithPort, useTls, label };
     const script = `<script>window.__PASEO_INITIAL_DAEMON_CONNECTION__=''\${serializeInlineScriptJson(hint)}</script>`;
     const headClose = /<\/head>/i;
-    if (headClose.test(html)) { return html.replace(headClose, `''\${script}</head>`); }
+    if (headClose.test(html)) { return html.replace(headClose, () => `''\${script}</head>`); }
     return script + html;
 }
 //# sourceMappingURL=web-ui.js.map
 WUIEOF
 
-        cat > "$HOME/.paseo/web-ui-loader.mjs" << 'LOADEREOF'
+        cat > "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" << 'LOADEREOF'
 export async function resolve(specifier, context, nextResolve) {
   const result = await nextResolve(specifier, context);
   if (result.url && result.url.includes("server/server/web-ui.js") && result.url.includes("@getpaseo")) {
@@ -306,7 +311,10 @@ export async function resolve(specifier, context, nextResolve) {
 }
 LOADEREOF
 
-        echo "$PASEO_PATCH_VERSION" > "$PASEO_PATCH_VERSION_FILE"
+        if mv -f "$HOME/.paseo/web-ui-patched.js.tmp.$$" "$HOME/.paseo/web-ui-patched.js" \
+           && mv -f "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" "$HOME/.paseo/web-ui-loader.mjs"; then
+          echo "$PASEO_PATCH_VERSION" > "$PASEO_PATCH_VERSION_FILE"
+        fi
       fi
     '';
   };

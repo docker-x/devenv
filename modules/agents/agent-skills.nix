@@ -81,7 +81,9 @@ in
       # (mirrors skills-sync.sh). A regular file is left untouched.
       ${lib.concatMapStrings (agent: ''
         _agent_skills="$HOME/${knownAgents.${agent} or ".${agent}/skills"}"
-        if [[ -d "$_agent_skills" && ! -L "$_agent_skills" ]]; then
+        if [[ "$_agent_skills" -ef "$_SKILLS_DIR" ]]; then
+          : # agent's skills path already is the shared dir — nothing to link
+        elif [[ -d "$_agent_skills" && ! -L "$_agent_skills" ]]; then
           _bak_base="$_agent_skills.bak.$(date +%Y%m%d%H%M%S)"
           _agent_bak="$_bak_base"
           _n=0

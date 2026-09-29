@@ -50,16 +50,18 @@ in
 
     allowedHosts = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [ ];
+      default = [ "127.0.0.1" "localhost" "[::1]" ];
       description = ''
         Allowlist of hostnames (or host:port pairs) the web UI's
         daemon-connection hint may echo back from the request's Host
         header. Requests whose Host is not listed receive no injected
         hint, which prevents Host header injection into the connection
-        hint. An empty list accepts any Host (acceptable for
-        localhost-only deployments). Entries may also be supplied at
-        runtime via PASEO_ALLOWED_HOSTS (comma-separated); the two
-        lists are merged.
+        hint. The default allows only localhost variants; add your
+        public hostname when the daemon is reached through a reverse
+        proxy. Setting an empty list accepts any Host — security-
+        sensitive, only for deployments where Host is already trusted.
+        Entries may also be supplied at runtime via
+        PASEO_ALLOWED_HOSTS (comma-separated); the two lists are merged.
       '';
     };
   };
@@ -152,7 +154,7 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="9-${if cfg.forceTls then "tls" else "notls"}-${builtins.substring 0 8 (builtins.hashString "sha256" (builtins.toJSON cfg.allowedHosts))}"
+      PASEO_PATCH_VERSION="10-${if cfg.forceTls then "tls" else "notls"}-${builtins.substring 0 8 (builtins.hashString "sha256" (builtins.toJSON cfg.allowedHosts))}"
       PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
@@ -310,10 +312,13 @@ function injectConnectionHint(html, req, label) {
     // entirely so the UI falls back to its default daemon address.
     const allowedHosts = CONFIGURED_ALLOWED_HOSTS
         .concat((process.env.PASEO_ALLOWED_HOSTS || "").split(","))
-        .map(h => h.trim().toLowerCase())
+        .map(h => h.trim().toLowerCase().replace(/^\[([^\]]+)\]$/, "$1"))
         .filter(Boolean);
     const requestHost = (typeof req.headers.host === "string" ? req.headers.host : "").trim().toLowerCase();
-    const requestHostname = requestHost.replace(/:\d+$/, "").replace(/^\[(.*)\]$/, "$1");
+    const bracketedIp = /^\[([0-9a-f:.%]+)\](?::\d+)?$/i.exec(requestHost);
+    const requestHostname = requestHost.startsWith("[")
+        ? (bracketedIp ? bracketedIp[1] : requestHost)
+        : (/^[^:]+:\d+$/.test(requestHost) ? requestHost.replace(/:\d+$/, "") : requestHost);
     if (!requestHost
         || (allowedHosts.length > 0 && !allowedHosts.includes(requestHost) && !allowedHosts.includes(requestHostname))) {
         return html;

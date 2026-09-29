@@ -8,6 +8,17 @@
 let
   helpers = import ../../lib/helpers.nix { inherit lib pkgs; };
   cfg = config.dx.tools.paseo;
+
+  # Content hash identifying one exact patched web UI — covers the patch
+  # template revision plus every value baked into the file (forceTls,
+  # allowedHosts). Distinct configs produce distinct filenames, so
+  # concurrent devenv shells with different dx.tools.paseo settings write
+  # separate files instead of overwriting each other's patched UI.
+  paseoPatchId = builtins.substring 0 12 (builtins.hashString "sha256" (builtins.toJSON {
+    version = 11;
+    forceTls = cfg.forceTls;
+    allowedHosts = cfg.allowedHosts;
+  }));
 in
 {
   options.dx.tools.paseo = {
@@ -74,6 +85,13 @@ in
         version = cfg.version;
       })
     ];
+
+    # Path of this config's patched web UI, consumed by web-ui-loader.mjs.
+    # env values are literal — "$HOME" is not shell-expanded (same
+    # convention as dx.core.agentConfig.dir); the loader expands a leading
+    # "$HOME"/"~" itself so the var also works for processes that never
+    # ran enterShell.
+    env.PASEO_WEB_UI_PATCH = "$HOME/.paseo/web-ui-patched-${paseoPatchId}.js";
 
     enterShell = ''
       # dx.tools.paseo: ensure .paseo directory exists
@@ -154,17 +172,20 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="10-${if cfg.forceTls then "tls" else "notls"}-${builtins.substring 0 8 (builtins.hashString "sha256" (builtins.toJSON cfg.allowedHosts))}"
-      PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
-      CURRENT_PATCH_VERSION=""
-      [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
-      if [ "$CURRENT_PATCH_VERSION" != "$PASEO_PATCH_VERSION" ]; then
+      #
+      # The file is content-addressed (paseoPatchId covers the template
+      # revision and the baked-in config) and written once — different
+      # projects get different filenames, identical projects share the same
+      # immutable file. web-ui-loader.mjs picks the file via
+      # PASEO_WEB_UI_PATCH, so a daemon serves the hint policy of the
+      # project whose shell spawned it.
+      PASEO_PATCHED_FILE="$HOME/.paseo/web-ui-patched-${paseoPatchId}.js"
+      if [ ! -f "$PASEO_PATCHED_FILE" ]; then
         # Write via unique temp + atomic mv so concurrent enterShell runs and
         # a racing paseo import never see a partially-written file. Stale
-        # temps from interrupted runs are swept first; the version marker is
-        # written only after both renames succeed.
-        rm -f "$HOME/.paseo/web-ui-patched.js.tmp."* "$HOME/.paseo/web-ui-loader.mjs.tmp."*
-        cat > "$HOME/.paseo/web-ui-patched.js.tmp.$$" << 'WUIEOF'
+        # temps from interrupted runs are swept first.
+        rm -f "$PASEO_PATCHED_FILE.tmp."*
+        cat > "$PASEO_PATCHED_FILE.tmp.$$" << 'WUIEOF'
 import { createReadStream, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 const EXCLUDED_PATH_PREFIXES = ["/api/", "/mcp/", "/public/"];
@@ -344,20 +365,39 @@ function injectConnectionHint(html, req, label) {
 }
 //# sourceMappingURL=web-ui.js.map
 WUIEOF
+        mv -f "$PASEO_PATCHED_FILE.tmp.$$" "$PASEO_PATCHED_FILE"
+      fi
 
-        cat > "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" << 'LOADEREOF'
+      # The loader is config-free and shared by all projects: it forwards
+      # paseo's web-ui module to $PASEO_WEB_UI_PATCH (set per project via
+      # env above) and expands a leading "$HOME"/"~" so the literal env
+      # value resolves. The unhashed legacy path stays the fallback for
+      # daemons launched outside a devenv shell. Rewritten only when
+      # missing or still on an older loader revision.
+      PASEO_LOADER_VERSION="2"
+      PASEO_LOADER_FILE="$HOME/.paseo/web-ui-loader.mjs"
+      PASEO_LOADER_VERSION_FILE="$HOME/.paseo/.web-ui-loader-version"
+      CURRENT_LOADER_VERSION=""
+      [ -f "$PASEO_LOADER_VERSION_FILE" ] && CURRENT_LOADER_VERSION=$(cat "$PASEO_LOADER_VERSION_FILE" 2>/dev/null || echo "")
+      if [ ! -f "$PASEO_LOADER_FILE" ] || [ "$CURRENT_LOADER_VERSION" != "$PASEO_LOADER_VERSION" ]; then
+        rm -f "$PASEO_LOADER_FILE.tmp."*
+        cat > "$PASEO_LOADER_FILE.tmp.$$" << 'LOADEREOF'
 export async function resolve(specifier, context, nextResolve) {
   const result = await nextResolve(specifier, context);
   if (result.url && result.url.includes("server/server/web-ui.js") && result.url.includes("@getpaseo")) {
-    return { url: "file://" + process.env.HOME + "/.paseo/web-ui-patched.js", shortCircuit: true };
+    return { url: "file://" + expandHome(process.env.PASEO_WEB_UI_PATCH || "$HOME/.paseo/web-ui-patched.js"), shortCircuit: true };
   }
   return result;
 }
+function expandHome(p) {
+  const home = process.env.HOME || "";
+  if (p === "~" || p.startsWith("~/")) { return home + p.slice(1); }
+  if (p === "$HOME" || p.startsWith("$HOME/")) { return home + p.slice(5); }
+  return p;
+}
 LOADEREOF
-
-        if mv -f "$HOME/.paseo/web-ui-patched.js.tmp.$$" "$HOME/.paseo/web-ui-patched.js" \
-           && mv -f "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" "$HOME/.paseo/web-ui-loader.mjs"; then
-          echo "$PASEO_PATCH_VERSION" > "$PASEO_PATCH_VERSION_FILE"
+        if mv -f "$PASEO_LOADER_FILE.tmp.$$" "$PASEO_LOADER_FILE"; then
+          echo "$PASEO_LOADER_VERSION" > "$PASEO_LOADER_VERSION_FILE"
         fi
       fi
     '';

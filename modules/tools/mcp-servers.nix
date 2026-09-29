@@ -54,13 +54,9 @@ let
           echo "$tmp" > "$tmp_file" && chmod "$old_mode" "$tmp_file" && mv "$tmp_file" "$config_file"
         fi
 
-        if jq -e --arg name "$server_name" '.mcpServers[$name]' "$config_file" >/dev/null 2>&1; then
-          : # already exists, skip
-        else
-          tmp=$(jq --arg name "$server_name" --argjson entry "$entry_json" \
-            '.mcpServers[$name] = $entry' "$config_file")
-          echo "$tmp" > "$tmp_file" && chmod "$old_mode" "$tmp_file" && mv "$tmp_file" "$config_file"
-        fi
+        tmp=$(jq --arg name "$server_name" --argjson entry "$entry_json" \
+          '.mcpServers[$name] = $entry' "$config_file")
+        echo "$tmp" > "$tmp_file" && chmod "$old_mode" "$tmp_file" && mv "$tmp_file" "$config_file"
       ) 200>"$lock_file"
     }
 
@@ -81,21 +77,35 @@ let
           touch "$config_file"
         fi
 
-        local header="[mcp_servers.$toml_key]"
-        local bare_header=""
+        local header="[mcp_servers.$toml_key]" prefix="[mcp_servers.$toml_key."
+        local bare_header="" bare_prefix=""
         if printf '%s' "$server_name" | grep -qE '^[A-Za-z0-9_-]+$'; then
           bare_header="[mcp_servers.$server_name]"
-        fi
-        if HEADER="$header" BARE_HEADER="$bare_header" awk '
-          { sub(/#.*$/, ""); gsub(/^[[:space:]]+|[[:space:]]+$/, ""); if ($0 == ENVIRON["HEADER"] || (ENVIRON["BARE_HEADER"] != "" && $0 == ENVIRON["BARE_HEADER"])) { found = 1; exit } }
-          END { exit !found }
-        ' "$config_file" 2>/dev/null; then
-          return 0
+          bare_prefix="[mcp_servers.$server_name."
         fi
 
-        local tmp_file="''${config_file}.tmp.$$"
+        local old_mode tmp_file="''${config_file}.tmp.$$"
+        old_mode=$(stat -c '%a' "$config_file" 2>/dev/null || echo "644")
         trap 'rm -f "$tmp_file"' EXIT
-        cp -p "$config_file" "$tmp_file"
+
+        HEADER="$header" BARE_HEADER="$bare_header" \
+          PREFIX="$prefix" BARE_PREFIX="$bare_prefix" \
+          awk '
+          {
+            line = $0
+            sub(/#.*$/, "", line)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+            if (substr(line, 1, 1) == "[") {
+              skip = (line == ENVIRON["HEADER"] ||
+                (ENVIRON["BARE_HEADER"] != "" && line == ENVIRON["BARE_HEADER"]) ||
+                index(line, ENVIRON["PREFIX"]) == 1 ||
+                (ENVIRON["BARE_PREFIX"] != "" && index(line, ENVIRON["BARE_PREFIX"]) == 1))
+            }
+            if (!skip) print
+          }
+        ' "$config_file" > "$tmp_file"
+        chmod "$old_mode" "$tmp_file"
+
         {
           echo ""
           echo "[mcp_servers.$toml_key]"
@@ -210,6 +220,8 @@ in
         MCP server registry. Entries with a `url` key are remote (HTTP/SSE)
         servers; entries with a `command` key are local (stdio) servers.
         Merged into each detected agent's native config on shell entry.
+        Registry entries are authoritative: a same-named entry in the agent
+        config is replaced, so registry changes propagate on the next run.
       '';
       example = {
         deepwiki = { url = "https://mcp.deepwiki.com/mcp"; };

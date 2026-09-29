@@ -182,8 +182,9 @@ in
   }
 }
 PASEOEOF
-          chmod 600 "$PASEO_CONFIG_TMP"
-          if mv -f "$PASEO_CONFIG_TMP" "$PASEO_CONFIG"; then
+          # $? is cat's status — a failed heredoc must not rename a
+          # partial temp into place.
+          if [ $? -eq 0 ] && chmod 600 "$PASEO_CONFIG_TMP" && mv -f "$PASEO_CONFIG_TMP" "$PASEO_CONFIG"; then
             echo "$PASEO_CONFIG_VERSION" > "$PASEO_VERSION_FILE"
           else
             rm -f "$PASEO_CONFIG_TMP"
@@ -438,8 +439,10 @@ LOADEREOF
 
       # dx.tools.paseo: sweep temp files orphaned by interrupted runs.
       # Age-gated — a blanket glob sweep could unlink a concurrent
-      # enterShell's in-progress temp and make its mv fail.
-      find "$HOME/.paseo" -maxdepth 1 \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +1 -delete 2>/dev/null || true
+      # enterShell's in-progress temp and make its mv fail. The 60-minute
+      # horizon keeps the window unreachable for a stalled writer while
+      # still sweeping orphans promptly.
+      find "$HOME/.paseo" -maxdepth 1 \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +60 -delete 2>/dev/null || true
     '';
   };
 }

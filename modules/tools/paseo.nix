@@ -129,10 +129,13 @@ in
           [ -f "$PASEO_CONFIG" ] && echo "dx.tools.paseo: previous config preserved at $PASEO_BAK" >&2
           # Write via PID-unique temp + atomic mv so a concurrent reader
           # never observes a truncated or interleaved config.json. The temp
-          # is pre-created with mode 600 so an interrupted write never
+          # is pre-created with mode 600 — and the write only proceeds if
+          # that pre-creation succeeded — so an interrupted write never
           # leaves a world-readable file at umask-default permissions.
           PASEO_CONFIG_TMP="$PASEO_CONFIG.tmp.$$"
-          install -m 600 /dev/null "$PASEO_CONFIG_TMP"
+          if ! install -m 600 /dev/null "$PASEO_CONFIG_TMP"; then
+            echo "dx.tools.paseo: could not create secure temp file $PASEO_CONFIG_TMP; keeping existing config" >&2
+          else
           cat > "$PASEO_CONFIG_TMP" << 'PASEOEOF'
 {
   "version": 1,
@@ -192,6 +195,7 @@ PASEOEOF
           else
             rm -f "$PASEO_CONFIG_TMP"
             echo "dx.tools.paseo: could not write $PASEO_CONFIG" >&2
+          fi
           fi
         fi
       fi

@@ -142,7 +142,9 @@ PASEOEOF
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
       if [ "$CURRENT_PATCH_VERSION" != "$PASEO_PATCH_VERSION" ]; then
-        cat > "$HOME/.paseo/web-ui-patched.js" << 'WUIEOF'
+        # Write via unique temp + atomic mv so concurrent enterShell runs and
+        # a racing paseo import never see a partially-written file.
+        cat > "$HOME/.paseo/web-ui-patched.js.tmp.$$" << 'WUIEOF'
 import { createReadStream, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 const EXCLUDED_PATH_PREFIXES = ["/api/", "/mcp/", "/public/"];
@@ -295,8 +297,9 @@ function injectConnectionHint(html, req, label) {
 }
 //# sourceMappingURL=web-ui.js.map
 WUIEOF
+        mv -f "$HOME/.paseo/web-ui-patched.js.tmp.$$" "$HOME/.paseo/web-ui-patched.js"
 
-        cat > "$HOME/.paseo/web-ui-loader.mjs" << 'LOADEREOF'
+        cat > "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" << 'LOADEREOF'
 export async function resolve(specifier, context, nextResolve) {
   const result = await nextResolve(specifier, context);
   if (result.url && result.url.includes("server/server/web-ui.js") && result.url.includes("@getpaseo")) {
@@ -305,6 +308,7 @@ export async function resolve(specifier, context, nextResolve) {
   return result;
 }
 LOADEREOF
+        mv -f "$HOME/.paseo/web-ui-loader.mjs.tmp.$$" "$HOME/.paseo/web-ui-loader.mjs"
 
         echo "$PASEO_PATCH_VERSION" > "$PASEO_PATCH_VERSION_FILE"
       fi

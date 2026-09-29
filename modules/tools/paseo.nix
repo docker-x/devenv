@@ -35,6 +35,18 @@ in
       default = true;
       description = "Serve the bundled web UI from the daemon.";
     };
+
+    forceTls = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Force the web UI daemon-connection hint to advertise TLS (wss/https)
+        regardless of request headers or socket state. Enable when the daemon
+        sits behind a TLS-terminating proxy that does not set
+        X-Forwarded-Proto. Equivalent to exporting FORCE_TLS=true into the
+        daemon's environment.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -125,7 +137,7 @@ PASEOEOF
       # through a reverse proxy (OAuth proxy, OpenShift Route). The patch
       # uses the request's Host header so the browser connects to the
       # public URL, which is proxied back to the daemon.
-      PASEO_PATCH_VERSION="2"
+      PASEO_PATCH_VERSION="3-${if cfg.forceTls then "tls" else "notls"}"
       PASEO_PATCH_VERSION_FILE="$HOME/.paseo/.patch-version"
       CURRENT_PATCH_VERSION=""
       [ -f "$PASEO_PATCH_VERSION_FILE" ] && CURRENT_PATCH_VERSION=$(cat "$PASEO_PATCH_VERSION_FILE" 2>/dev/null || echo "")
@@ -262,7 +274,16 @@ function serializeInlineScriptJson(value) {
 }
 function injectConnectionHint(html, req, label) {
     const host = typeof req.headers.host === "string" ? req.headers.host : "";
-    const useTls = true; // OpenShift Route always terminates TLS
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)?.split(",")[0].trim().toLowerCase();
+    // A locally encrypted socket decides (the peer spoke TLS); only a
+    // plain socket trusts X-Forwarded-Proto, since a direct client could
+    // otherwise spoof the scheme. FORCE_TLS (or dx.tools.paseo.forceTls)
+    // overrides for proxies that terminate TLS without setting the header.
+    const useTls = ${if cfg.forceTls then "true" else "false"}
+        || process.env.FORCE_TLS === "true"
+        || req.socket?.encrypted === true
+        || proto === "https";
     const defaultPort = useTls ? 443 : 80;
     const hostWithPort = host.includes(":") ? host : host + ":" + defaultPort;
     const hint = { listen: hostWithPort, useTls, label };

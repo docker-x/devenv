@@ -75,12 +75,16 @@ in
 
       # Create per-agent symlinks (native skills dir per agent).
       # ln -sfn into a real dir nests the link inside it instead of
-      # replacing it — back the dir up first (mirrors skills-sync.sh).
+      # replacing it — move any non-symlink path aside first. The backup
+      # is timestamped so reruns never clobber an earlier one
+      # (mirrors skills-sync.sh).
       ${lib.concatMapStrings (agent: ''
         _agent_skills="$HOME/${knownAgents.${agent} or ".${agent}/skills"}"
-        if [[ -d "$_agent_skills" && ! -L "$_agent_skills" ]]; then
-          echo "dx.agents.agent-skills: backing up $_agent_skills -> ''${_agent_skills}.bak"
-          mv "$_agent_skills" "''${_agent_skills}.bak" 2>/dev/null || true
+        if [[ -e "$_agent_skills" && ! -L "$_agent_skills" ]]; then
+          _agent_bak="$_agent_skills.bak.$(date +%Y%m%d%H%M%S)"
+          echo "dx.agents.agent-skills: backing up $_agent_skills -> $_agent_bak"
+          mv "$_agent_skills" "$_agent_bak" 2>/dev/null \
+            || echo "dx.agents.agent-skills: WARNING: could not replace $_agent_skills; skills not linked" >&2
         fi
         if [[ ! -e "$_agent_skills" || -L "$_agent_skills" ]]; then
           mkdir -p "$(dirname "$_agent_skills")"

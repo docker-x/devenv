@@ -32,6 +32,12 @@ let
 
     echo "configure-mcp: applying $SERVER_COUNT servers from $REGISTRY_FILE"
 
+    jq -r 'to_entries[] | select(.value | type != "object") | .key' "$REGISTRY_FILE" \
+      | while IFS= read -r skipped_name; do
+          echo "configure-mcp: skipping $skipped_name: registry entry is not an object" >&2
+        done
+    OBJECT_KEYS=$(jq -r 'to_entries[] | select(.value | type == "object") | .key' "$REGISTRY_FILE")
+
     merge_into_json() {
       local config_file="$1" server_name="$2" entry_json="$3"
       local tmp tmp_file old_mode lock_file="''${config_file}.lock"
@@ -62,10 +68,8 @@ let
 
     merge_into_toml() {
       local config_file="$1" server_name="$2" entry_json="$3"
-      local has_url has_command toml_key lock_file="''${config_file}.lock"
+      local toml_key lock_file="''${config_file}.lock"
 
-      has_url=$(echo "$entry_json" | jq -r 'has("url")')
-      has_command=$(echo "$entry_json" | jq -r 'has("command")')
       toml_key=$(printf '%s' "$server_name" | jq -Rr '@json')
 
       mkdir -p "$(dirname "$config_file")"
@@ -128,19 +132,39 @@ let
         ' "$config_file" > "$tmp_file"
         chmod "$old_mode" "$tmp_file"
 
-        {
-          if [ -s "$tmp_file" ]; then echo ""; fi
-          echo "[mcp_servers.$toml_key]"
-          if [ "$has_url" = "true" ]; then
-            echo "$entry_json" | jq -r '"url = " + (.url | @json)'
-          fi
-          if [ "$has_command" = "true" ]; then
-            echo "$entry_json" | jq -r '"command = " + (.command | @json)'
-            echo "$entry_json" | jq -r 'if .args then "args = [" + ([.args[] | @json] | join(", ")) + "]" else empty end'
-            echo "$entry_json" | jq -r 'if .env then "env = { " + ([.env | to_entries[] | (.key | @json) + " = " + (.value | @json)] | join(", ")) + " }" else empty end' 2>/dev/null || true
-          fi
-        } >> "$tmp_file"
-        mv "$tmp_file" "$config_file"
+        local serialized
+        serialized=$(echo "$entry_json" | jq -r '
+          def toml_value:
+            if type == "object" then
+              "{ " + ([to_entries[] | select(.value != null)
+                | (.key | @json) + " = " + (.value | toml_value)] | join(", ")) + " }"
+            elif type == "array" then
+              "[" + ([.[] | select(. != null) | toml_value] | join(", ")) + "]"
+            elif type == "string" then @json
+            else tostring end;
+          (if (.headers | type) == "object" then
+             .http_headers = (.headers + (.http_headers // {}))
+           else . end)
+          | ((if .command != null
+              then ["command", "args", "env", "env_vars", "cwd"]
+              else ["url", "bearer_token_env_var", "http_headers", "env_http_headers"] end)
+             + ["enabled", "required", "startup_timeout_sec", "startup_timeout_ms",
+                "tool_timeout_sec", "enabled_tools", "disabled_tools", "scopes"]) as $keys
+          | $keys[] as $k
+          | select(.[$k] != null)
+          | "\($k) = \(.[$k] | toml_value)"
+        ' 2>/dev/null) || serialized=""
+
+        if [ -n "$serialized" ]; then
+          {
+            if [ -s "$tmp_file" ]; then echo ""; fi
+            echo "[mcp_servers.$toml_key]"
+            echo "$serialized"
+          } >> "$tmp_file"
+          mv "$tmp_file" "$config_file"
+        else
+          echo "configure-mcp: skipping $server_name: no serializable Codex fields" >&2
+        fi
       ) 200>"$lock_file"
     }
 
@@ -151,6 +175,7 @@ let
       fi
       echo "configure-mcp: configuring Claude Code"
       while IFS= read -r server_name; do
+        [ -n "$server_name" ] || continue;
         entry=$(jq -c --arg name "$server_name" '.[$name]' "$REGISTRY_FILE")
         has_url=$(echo "$entry" | jq -r 'has("url")')
         if [ "$has_url" = "true" ]; then
@@ -159,7 +184,7 @@ let
           adapted="$entry"
         fi
         merge_into_json "$claude_config" "$server_name" "$adapted"
-      done < <(jq -r 'keys[]' "$REGISTRY_FILE")
+      done <<< "$OBJECT_KEYS"
     }
 
     apply_codex() {
@@ -169,9 +194,10 @@ let
       fi
       echo "configure-mcp: configuring Codex"
       while IFS= read -r server_name; do
+        [ -n "$server_name" ] || continue;
         entry=$(jq -c --arg name "$server_name" '.[$name]' "$REGISTRY_FILE")
         merge_into_toml "$codex_config" "$server_name" "$entry"
-      done < <(jq -r 'keys[]' "$REGISTRY_FILE")
+      done <<< "$OBJECT_KEYS"
     }
 
     apply_devin() {
@@ -181,6 +207,7 @@ let
       fi
       echo "configure-mcp: configuring Devin"
       while IFS= read -r server_name; do
+        [ -n "$server_name" ] || continue;
         entry=$(jq -c --arg name "$server_name" '.[$name]' "$REGISTRY_FILE")
         has_url=$(echo "$entry" | jq -r 'has("url")')
         if [ "$has_url" = "true" ]; then
@@ -189,7 +216,7 @@ let
           adapted="$entry"
         fi
         merge_into_json "$devin_config" "$server_name" "$adapted"
-      done < <(jq -r 'keys[]' "$REGISTRY_FILE")
+      done <<< "$OBJECT_KEYS"
     }
 
     apply_cursor() {
@@ -199,9 +226,10 @@ let
       fi
       echo "configure-mcp: configuring Cursor"
       while IFS= read -r server_name; do
+        [ -n "$server_name" ] || continue;
         entry=$(jq -c --arg name "$server_name" '.[$name]' "$REGISTRY_FILE")
         merge_into_json "$cursor_config" "$server_name" "$entry"
-      done < <(jq -r 'keys[]' "$REGISTRY_FILE")
+      done <<< "$OBJECT_KEYS"
     }
 
     apply_copilot() {
@@ -211,6 +239,7 @@ let
       fi
       echo "configure-mcp: configuring GitHub Copilot"
       while IFS= read -r server_name; do
+        [ -n "$server_name" ] || continue;
         entry=$(jq -c --arg name "$server_name" '.[$name]' "$REGISTRY_FILE")
         has_url=$(echo "$entry" | jq -r 'has("url")')
         if [ "$has_url" = "true" ]; then
@@ -219,7 +248,7 @@ let
           adapted=$(echo "$entry" | jq -c '. + {"type": "local"}')
         fi
         merge_into_json "$copilot_config" "$server_name" "$adapted"
-      done < <(jq -r 'keys[]' "$REGISTRY_FILE")
+      done <<< "$OBJECT_KEYS"
     }
 
     apply_claude
@@ -244,6 +273,9 @@ in
         Merged into each detected agent's native config on shell entry.
         Registry entries are authoritative: a same-named entry in the agent
         config is replaced, so registry changes propagate on the next run.
+        For Codex (config.toml) all fields supported by its transport schema
+        are written; `headers` maps to `http_headers` on url servers. Fields
+        Codex does not support for a transport are omitted.
       '';
       example = {
         deepwiki = { url = "https://mcp.deepwiki.com/mcp"; };

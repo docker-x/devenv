@@ -50,7 +50,7 @@ in
   config = lib.mkIf cfg.enable {
     dx.core.agentConfig.enable = true;
 
-    packages = [ pkgs.gh pkgs.jq ];
+    packages = [ pkgs.gh pkgs.jq pkgs.coreutils ];
 
     enterShell = ''
       # dx.agents.agent-skills: sync skills on first login.
@@ -73,10 +73,31 @@ in
         fi
       '') cfg.skills}
 
-      # Create per-agent symlinks (native skills dir per agent)
+      # Create per-agent symlinks (native skills dir per agent).
+      # ln -sfn into a real dir nests the link inside it instead of
+      # replacing it — move a real dir aside first. The backup name is
+      # reserved (suffixed until free) and mv -T can never nest into an
+      # existing backup dir, so reruns never clobber an earlier backup
+      # (mirrors skills-sync.sh). A regular file is left untouched.
       ${lib.concatMapStrings (agent: ''
         _agent_skills="$HOME/${knownAgents.${agent} or ".${agent}/skills"}"
-        if [[ ! -L "$_agent_skills" ]]; then
+        if [[ "$_agent_skills" -ef "$_SKILLS_DIR" ]]; then
+          : # agent's skills path already is the shared dir — nothing to link
+        elif [[ -d "$_agent_skills" && ! -L "$_agent_skills" ]]; then
+          _bak_base="$_agent_skills.bak.$(date +%Y%m%d%H%M%S)"
+          _agent_bak="$_bak_base"
+          _n=0
+          while [[ -e "$_agent_bak" || -L "$_agent_bak" ]]; do
+            _n=$((_n + 1))
+            _agent_bak="$_bak_base.$_n"
+          done
+          echo "dx.agents.agent-skills: backing up $_agent_skills -> $_agent_bak"
+          mv -T "$_agent_skills" "$_agent_bak" 2>/dev/null \
+            || echo "dx.agents.agent-skills: WARNING: could not replace $_agent_skills; skills not linked" >&2
+        elif [[ -e "$_agent_skills" && ! -L "$_agent_skills" ]]; then
+          echo "dx.agents.agent-skills: WARNING: $_agent_skills is not a directory; leaving untouched, skills not linked" >&2
+        fi
+        if [[ ! -e "$_agent_skills" || -L "$_agent_skills" ]]; then
           mkdir -p "$(dirname "$_agent_skills")"
           ln -sfn "$_SKILLS_DIR" "$_agent_skills" 2>/dev/null || true
         fi

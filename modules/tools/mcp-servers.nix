@@ -47,6 +47,7 @@ let
 
         old_mode=$(stat -c '%a' "$config_file" 2>/dev/null || echo "644")
         tmp_file="''${config_file}.tmp.$$"
+        trap 'rm -f "$tmp_file"' EXIT
 
         if ! jq -e '.mcpServers' "$config_file" >/dev/null 2>&1; then
           tmp=$(jq '. + {"mcpServers": {}}' "$config_file")

@@ -109,8 +109,11 @@ in
       # directory at the key path and recursive delete would wipe its
       # contents. rmdir removes only an empty dir; a non-empty one fails
       # safe. The .pub path gets the same treatment — a planted dir there
-      # would make ssh-keygen fail.
-      if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]]; then
+      # would make ssh-keygen fail. A key that passes -f/-r but is torn or
+      # corrupt (crash mid-copy, partial PVC write) would brick sshd on
+      # load, so ssh-keygen -y gates the keep path too.
+      if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]] \
+        || ! ssh-keygen -y -f "$SSH_KEY" >/dev/null 2>&1; then
         for p in "$SSH_KEY" "$SSH_KEY.pub"; do
           if [[ -d "$p" && ! -L "$p" ]]; then
             rmdir "$p" 2>/dev/null || {

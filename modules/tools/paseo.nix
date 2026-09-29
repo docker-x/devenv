@@ -448,8 +448,11 @@ LOADEREOF
       # Age-gated — a blanket glob sweep could unlink a concurrent
       # enterShell's in-progress temp and make its mv fail. The 60-minute
       # horizon keeps the window unreachable for a stalled writer while
-      # still sweeping orphans promptly.
-      find "$HOME/.paseo" -maxdepth 1 \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' -o -name 'config.json.bak.*.tmp.*' \) -mmin +60 -delete 2>/dev/null || true
+      # still sweeping orphans promptly. Backup temps are gated on ctime
+      # (-cmin) not mtime: `cp -p` preserves the source mtime, so a backup
+      # temp for an old config is born "old" by mtime and would be swept
+      # mid-cp; its ctime is always fresh.
+      find "$HOME/.paseo" -maxdepth 1 \( \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +60 -o -name 'config.json.bak.*.tmp.*' -cmin +60 \) -delete 2>/dev/null || true
     '';
   };
 }

@@ -94,6 +94,7 @@ let
         fi
 
         local tmp_file="''${config_file}.tmp.$$"
+        trap 'rm -f "$tmp_file"' EXIT
         cp -p "$config_file" "$tmp_file"
         {
           echo ""

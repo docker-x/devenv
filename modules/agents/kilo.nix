@@ -16,10 +16,14 @@ let
     aarch64-linux = "arm64";
   }.${pkgs.stdenv.hostPlatform.system} or (throw "dx.agents.kilo: unsupported system ${pkgs.stdenv.hostPlatform.system}");
 
-  # sha256 of the v1.0.25 release assets (from GitHub API asset digests)
+  # sha256 of release assets (from GitHub API asset digests), keyed by
+  # release tag. Versions without an entry fall back to lib.fakeHash so a
+  # bump surfaces the standard fill-in-the-hash flow, not a stale hash.
   hashes = {
-    x86_64-linux = "41b11206107c619c880076dfbdaed6b4b03c2263376fb1b3372b14bd9613564a";
-    aarch64-linux = "1af9d2c8ef4c14b80d22c231ec640ac3aedd2b5d710bf9850e2027fd42fa261a";
+    "v1.0.25" = {
+      x86_64-linux = "41b11206107c619c880076dfbdaed6b4b03c2263376fb1b3372b14bd9613564a";
+      aarch64-linux = "1af9d2c8ef4c14b80d22c231ec640ac3aedd2b5d710bf9850e2027fd42fa261a";
+    };
   };
 in
 {
@@ -44,7 +48,7 @@ in
         owner = "Kilo-Org";
         repo = "kilo";
         asset = "kilo-linux-${archSuffix}.tar.gz";
-        sha256 = hashes.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
+        sha256 = hashes.${cfg.version}.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
       })
     ];
   };

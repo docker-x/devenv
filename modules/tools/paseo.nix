@@ -496,14 +496,66 @@ LOADEREOF
       fi
 
       # dx.tools.paseo: sweep temp files orphaned by interrupted runs.
-      # Age-gated — a blanket glob sweep could unlink a concurrent
-      # enterShell's in-progress temp and make its mv fail. The 60-minute
-      # horizon keeps the window unreachable for a stalled writer while
-      # still sweeping orphans promptly. Backup temps are gated on ctime
-      # (-cmin) not mtime: `cp -p` preserves the source mtime, so a backup
-      # temp for an old config is born "old" by mtime and would be swept
-      # mid-cp; its ctime is always fresh.
-      find "$HOME/.paseo" -maxdepth 1 \( \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +60 -o -name 'config.json.bak.*.tmp.*' -cmin +60 \) -delete 2>/dev/null || true
+      # The .tmp.$$ suffix names the interactive shell, which outlives
+      # the write — a bare kill -0 would exempt every Ctrl-C orphan whose
+      # shell survived — and the open fd belongs to the writer's
+      # cat/cp/install child, never to $$ itself. So "in progress" means
+      # some process still holds the file open — detected by stat'ing
+      # every /proc/*/fd entry with -ef, which follows each symlink to
+      # the inode; entries denied by the ptrace gate belong to foreign
+      # UIDs and fail closed to "no match" per entry instead of aborting
+      # the scan (find -lname cannot do this — a single unreadable fd
+      # entry fails the whole run, which would turn every scan into a
+      # false "held" or a false "clean" depending on how its status was
+      # read). Foreign-UID holders the scan cannot see are covered
+      # below: their temps carry their own PID in the name and land on
+      # the liveness/age gates. "Dead session" means the naming PID is
+      # gone entirely — kill -0 also fails with EPERM on a live
+      # foreign-UID PID, so ps -p decides and an inaccessible live PID
+      # is age-gated like any other live PID. A verifiably dead PID's
+      # temp must still be a minute old by ctime — a PID-reuse writer's
+      # install/cp/cat refreshes ctime back-to-back with the write, so
+      # the sweep stays serialized behind any writer's create→open→mv
+      # sequence. Every other temp waits out the 60-minute age gate — a
+      # live shell may legitimately sit in the create→open gap with no
+      # fd held, and non-PID-suffixed foreign files are age-gated too.
+      # Backup temps are gated on ctime (-cmin) not mtime: `cp -p`
+      # preserves the source mtime, so a backup temp for an old config
+      # is born "old" by mtime and would be swept mid-cp; its ctime is
+      # always fresh. Without /proc (macOS) the fd check is skipped and
+      # the PID-dead fast path plus age gate still apply.
+      for PASEO_TMP in "$HOME/.paseo/"web-ui-*.tmp.* "$HOME/.paseo/"config.json.tmp.* "$HOME/.paseo/"config.json.bak.*.tmp.*; do
+        [ -f "$PASEO_TMP" ] || continue
+        if [ -d /proc ]; then
+          PASEO_FD_OPEN=""
+          for PASEO_FD_LINK in /proc/[0-9]*/fd/*; do
+            [ "$PASEO_FD_LINK" -ef "$PASEO_TMP" ] && { PASEO_FD_OPEN=1; break; }
+          done
+          [ -n "$PASEO_FD_OPEN" ] && continue
+        fi
+        PASEO_TMP_PID="''${PASEO_TMP##*.tmp.}"
+        case "$PASEO_TMP_PID" in
+          *[!0-9]* | "") ;;
+          *) if ! kill -0 "$PASEO_TMP_PID" 2>/dev/null && ! ps -p "$PASEO_TMP_PID" >/dev/null 2>&1; then
+            # Both checks failed → PID is truly dead (ESRCH), not just
+            # inaccessible. The ctime floor keeps a temp that a
+            # PID-reuse writer created or truncated within the last
+            # minute even though its naming PID was dead moments ago
+            # (find minute tests round up: -cmin +1 means ctime >60s ago).
+            [ -z "$(find "$PASEO_TMP" -cmin +1 -print 2>/dev/null)" ] && continue
+            rm -f "$PASEO_TMP"
+            continue
+          fi ;;
+        esac
+        case "$PASEO_TMP" in
+          *.bak.*) PASEO_AGE_OPT="-cmin" ;;
+          *) PASEO_AGE_OPT="-mmin" ;;
+        esac
+        # No -maxdepth needed: the [ -f ] guard guarantees a file
+        # starting point, and BSD find (macOS) lacks -maxdepth anyway.
+        [ -n "$(find "$PASEO_TMP" "$PASEO_AGE_OPT" +60 -print 2>/dev/null)" ] && rm -f "$PASEO_TMP"
+      done
+      unset PASEO_TMP PASEO_TMP_PID PASEO_AGE_OPT PASEO_FD_OPEN PASEO_FD_LINK
     '';
   };
 }

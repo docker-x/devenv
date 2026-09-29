@@ -136,7 +136,7 @@ in
       PASEO_VERSION_FILE="$HOME/.paseo/.config-version"
       CURRENT_VERSION=""
       [ -f "$PASEO_VERSION_FILE" ] && CURRENT_VERSION=$(cat "$PASEO_VERSION_FILE" 2>/dev/null || echo "")
-      if [ ! -f "$PASEO_CONFIG" ] || [ "$CURRENT_VERSION" != "$PASEO_CONFIG_VERSION" ]; then
+      if [[ ! -f "$PASEO_CONFIG" || "$CURRENT_VERSION" != "$PASEO_CONFIG_VERSION" ]]; then
         # Back up before regenerating: a fresh timestamped destination each
         # run keeps every prior config (not just the last), the copy goes
         # through a PID-unique temp + atomic mv so the .bak file is never

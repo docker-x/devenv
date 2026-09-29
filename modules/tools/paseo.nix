@@ -496,14 +496,40 @@ LOADEREOF
       fi
 
       # dx.tools.paseo: sweep temp files orphaned by interrupted runs.
-      # Age-gated — a blanket glob sweep could unlink a concurrent
-      # enterShell's in-progress temp and make its mv fail. The 60-minute
-      # horizon keeps the window unreachable for a stalled writer while
-      # still sweeping orphans promptly. Backup temps are gated on ctime
-      # (-cmin) not mtime: `cp -p` preserves the source mtime, so a backup
-      # temp for an old config is born "old" by mtime and would be swept
-      # mid-cp; its ctime is always fresh.
-      find "$HOME/.paseo" -maxdepth 1 \( \( -name 'web-ui-*.tmp.*' -o -name 'config.json.tmp.*' \) -mmin +60 -o -name 'config.json.bak.*.tmp.*' -cmin +60 \) -delete 2>/dev/null || true
+      # The .tmp.$$ suffix names the interactive shell, which outlives
+      # the write — a bare kill -0 would exempt every Ctrl-C orphan whose
+      # shell survived — and the open fd belongs to the writer's
+      # cat/cp/install child, never to $$ itself. So "in progress" means
+      # some process still holds the file open (scanned across all /proc
+      # fds) and "dead session" means the naming PID no longer exists;
+      # dead-session temps are swept without waiting. A live PID still
+      # waits out the 60-minute age gate — the live shell may sit in the
+      # create→open gap between install/cp and cat where the temp
+      # legitimately exists with no fd — and a non-PID suffix (foreign
+      # file) is age-gated too. Backup temps are gated on ctime (-cmin)
+      # not mtime: `cp -p` preserves the source mtime, so a backup temp
+      # for an old config is born "old" by mtime and would be swept
+      # mid-cp; its ctime is always fresh. Without /proc (macOS) the fd
+      # check is skipped and the PID-dead fast path plus age gate still
+      # apply.
+      for PASEO_TMP in "$HOME/.paseo/"web-ui-*.tmp.* "$HOME/.paseo/"config.json.tmp.* "$HOME/.paseo/"config.json.bak.*.tmp.*; do
+        [ -f "$PASEO_TMP" ] || continue
+        if [ -d /proc ]; then
+          PASEO_TMP_REAL="$(readlink -f "$PASEO_TMP" 2>/dev/null || echo "$PASEO_TMP")"
+          [ -n "$(find /proc/[0-9]*/fd -maxdepth 1 -type l -lname "$PASEO_TMP_REAL" -print -quit 2>/dev/null)" ] && continue
+        fi
+        PASEO_TMP_PID="''${PASEO_TMP##*.tmp.}"
+        case "$PASEO_TMP_PID" in
+          *[!0-9]* | "") ;;
+          *) kill -0 "$PASEO_TMP_PID" 2>/dev/null || { rm -f "$PASEO_TMP"; continue; } ;;
+        esac
+        case "$PASEO_TMP" in
+          *.bak.*) PASEO_AGE_OPT="-cmin" ;;
+          *) PASEO_AGE_OPT="-mmin" ;;
+        esac
+        [ -n "$(find "$PASEO_TMP" -maxdepth 0 "$PASEO_AGE_OPT" +60 2>/dev/null)" ] && rm -f "$PASEO_TMP"
+      done
+      unset PASEO_TMP PASEO_TMP_REAL PASEO_TMP_PID PASEO_AGE_OPT
     '';
   };
 }

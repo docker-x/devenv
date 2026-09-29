@@ -27,7 +27,12 @@ in
     version = lib.mkOption {
       type = lib.types.str;
       default = "latest";
-      description = "Version of Claude Code to install (npm package version or 'latest').";
+      description = ''
+        Version of Claude Code to install. "latest" uses the bundled nixpkgs
+        binary (offline, not necessarily the newest release); any other value
+        is passed to npx as the npm specifier (e.g. "2.1.270" or a dist-tag
+        like "next").
+      '';
     };
 
     shareConfig = lib.mkOption {

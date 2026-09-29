@@ -111,9 +111,10 @@ in
       # safe. The .pub path gets the same treatment — a planted dir there
       # would make ssh-keygen fail. A key that passes -f/-r but is torn or
       # corrupt (crash mid-copy, partial PVC write) would brick sshd on
-      # load, so ssh-keygen -y gates the keep path too.
+      # load, so ssh-keygen -y gates the keep path too. -P "" keeps a
+      # planted encrypted key from blocking on a passphrase prompt.
       if [[ ! -f "$SSH_KEY" || ! -r "$SSH_KEY" ]] \
-        || ! ssh-keygen -y -f "$SSH_KEY" >/dev/null 2>&1; then
+        || ! ssh-keygen -P "" -y -f "$SSH_KEY" >/dev/null 2>&1; then
         for p in "$SSH_KEY" "$SSH_KEY.pub"; do
           if [[ -d "$p" && ! -L "$p" ]]; then
             rmdir "$p" 2>/dev/null || {

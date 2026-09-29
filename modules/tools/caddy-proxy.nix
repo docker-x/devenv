@@ -22,6 +22,19 @@ in
       default = 2019;
       description = "Caddy admin API port.";
     };
+
+    upstreams = lib.mkOption {
+      type = lib.types.nonEmptyListOf lib.types.str;
+      default = [
+        "127.0.0.1:3000"
+        "127.0.0.1:5173"
+        "127.0.0.1:8081"
+      ];
+      description = ''
+        Backend addresses tried in order — the first reachable upstream
+        serves requests; unreachable ones are skipped while marked down.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -33,8 +46,13 @@ in
         admin :${toString cfg.adminPort}
       }
       :${toString cfg.listenPort} {
-        # Proxy to common dev server ports — try each in order
-        reverse_proxy 127.0.0.1:3000 127.0.0.1:5173 127.0.0.1:8081
+        # Ordered fallback: first reachable upstream wins; a failed dial
+        # marks it down for fail_duration so requests stick to the live port.
+        reverse_proxy ${lib.concatStringsSep " " cfg.upstreams} {
+          lb_policy first
+          lb_try_duration 10s
+          fail_duration 30s
+        }
       }
 CADDYEOF
 )

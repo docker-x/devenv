@@ -400,7 +400,13 @@ function injectConnectionHint(html, req, label) {
 }
 //# sourceMappingURL=web-ui.js.map
 WUIEOF
-        mv -f "$PASEO_PATCHED_FILE.tmp.$$" "$PASEO_PATCHED_FILE"
+        # $? is cat's status — a failed heredoc must not rename a partial
+        # temp into place; file existence is the write-once guard, so a
+        # partial file would be served permanently.
+        if [ $? -ne 0 ] || ! mv -f "$PASEO_PATCHED_FILE.tmp.$$" "$PASEO_PATCHED_FILE"; then
+          rm -f "$PASEO_PATCHED_FILE.tmp.$$"
+          echo "dx.tools.paseo: could not write $PASEO_PATCHED_FILE" >&2
+        fi
       fi
 
       # The loader is config-free and shared by all projects: it forwards
@@ -439,8 +445,13 @@ function expandHome(p) {
   return p;
 }
 LOADEREOF
-        if mv -f "$PASEO_LOADER_FILE.tmp.$$" "$PASEO_LOADER_FILE"; then
+        # $? is cat's status — a failed heredoc must not mark a partial
+        # loader as the current version.
+        if [ $? -eq 0 ] && mv -f "$PASEO_LOADER_FILE.tmp.$$" "$PASEO_LOADER_FILE"; then
           echo "$PASEO_LOADER_VERSION" > "$PASEO_LOADER_VERSION_FILE"
+        else
+          rm -f "$PASEO_LOADER_FILE.tmp.$$"
+          echo "dx.tools.paseo: could not write $PASEO_LOADER_FILE" >&2
         fi
       fi
 

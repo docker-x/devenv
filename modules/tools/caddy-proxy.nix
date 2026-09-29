@@ -43,7 +43,7 @@ in
     processes.caddy-proxy.exec = ''
       caddy run --adapter caddyfile --config <(cat <<'CADDYEOF'
       {
-        admin :${toString cfg.adminPort}
+        admin localhost:${toString cfg.adminPort}
       }
       :${toString cfg.listenPort} {
         # Ordered fallback: first reachable upstream wins; a failed dial

@@ -263,7 +263,7 @@ function serializeInlineScriptJson(value) {
 function injectConnectionHint(html, req, label) {
     const host = typeof req.headers.host === "string" ? req.headers.host : "";
     const forwardedProto = req.headers["x-forwarded-proto"];
-    const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)?.split(",")[0].trim().toLowerCase();
+    const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)?.split(",")[0].trim().toLowerCase() || undefined;
     // Behind a proxy, trust X-Forwarded-Proto; on a direct connection, inspect
     // the socket. FORCE_TLS overrides for deployments that terminate TLS
     // without setting the header (e.g. OpenShift Route passthrough).

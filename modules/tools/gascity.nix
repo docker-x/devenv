@@ -103,5 +103,25 @@ in
         gc register .
       '';
     };
+
+    # Store-pinned binaries — updater reports drift; real update = version
+    # bump here + image rebuild.
+    dx.tools.updater.entries = [
+      {
+        name = "gc";
+        current = "echo ${cfg.version}";
+        latest = "gh release view --repo gastownhall/gascity --json tagName -q .tagName 2>/dev/null";
+      }
+      {
+        name = "bd";
+        current = "echo ${cfg.beadsVersion}";
+        latest = "gh release view --repo gastownhall/beads --json tagName -q .tagName 2>/dev/null";
+      }
+      {
+        name = "dolt";
+        current = "echo ${cfg.doltVersion}";
+        latest = "gh release view --repo dolthub/dolt --json tagName -q .tagName 2>/dev/null";
+      }
+    ];
   };
 }

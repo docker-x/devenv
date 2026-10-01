@@ -67,7 +67,7 @@ in
     dx.tools.updater.entries = [{
       name = "devin";
       current = "devin --version 2>/dev/null | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
-      latest = "curl --proto =https -fsSL https://static.devin.ai/cli/api/cli/update 2>/dev/null | grep -oE '\"version\"[^,}]*' | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
+      latest = "curl --proto =https -fsSL https://static.devin.ai/cli/current/manifest.json 2>/dev/null | grep -oE '\"version\"[^,}]*' | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
       update = lib.optionalString (cfg.installMethod == "script") "curl --proto =https -fsSL https://cli.devin.ai/install.sh | bash";
     }];
   };

@@ -66,7 +66,7 @@ let
     _names=() _currents=() _latests=() _updates=()
     ${entryArrays}
 
-    _n_ok=0 _n_upd=0 _n_pin=0 _n_would=0 _n_fail=0
+    _n_ok=0 _n_upd=0 _n_pin=0 _n_would=0 _n_skip=0 _n_fail=0
     _row() { printf '%-18s %-14s %-14s %s\n' "$1" "$2" "$3" "$4"; }
 
     # Entry commands are build-time literals baked in by nix
@@ -80,7 +80,7 @@ let
         _row "$name" "$cur" "$latest" "up to date"; _n_ok=$((_n_ok+1)); return
       fi
       if [ -z "$latest" ] || [ "$latest" = "?" ]; then
-        _row "$name" "''${cur:-?}" "?" "latest unknown — skipped"; _n_fail=$((_n_fail+1)); return
+        _row "$name" "''${cur:-?}" "?" "latest unknown — skipped"; _n_skip=$((_n_skip+1)); return
       fi
       if [ -z "$upd_cmd" ]; then
         _row "$name" "''${cur:-?}" "$latest" "pinned — bump devenv option + rebuild"; _n_pin=$((_n_pin+1)); return
@@ -172,7 +172,7 @@ let
     fi
 
     echo
-    printf 'summary: %d current, %d updated, %d would-update, %d pinned, %d failed\n' "$_n_ok" "$_n_upd" "$_n_would" "$_n_pin" "$_n_fail"
+    printf 'summary: %d current, %d updated, %d would-update, %d pinned, %d skipped, %d failed\n' "$_n_ok" "$_n_upd" "$_n_would" "$_n_pin" "$_n_skip" "$_n_fail"
     [ "$_n_fail" -eq 0 ]
   '';
 in

@@ -106,22 +106,19 @@ in
 
     # Store-pinned binaries — updater reports drift; real update = version
     # bump here + image rebuild.
-    dx.tools.updater.entries = [
-      {
-        name = "gc";
-        current = "echo ${cfg.version}";
-        latest = "curl -fsSL https://api.github.com/repos/gastownhall/gascity/releases/latest 2>/dev/null | grep -oE '\"tag_name\"[^,}]*' | grep -oE 'v?[0-9.]+([-.][a-z0-9]+)?' | head -1";
-      }
-      {
-        name = "bd";
-        current = "echo ${cfg.beadsVersion}";
-        latest = "curl -fsSL https://api.github.com/repos/gastownhall/beads/releases/latest 2>/dev/null | grep -oE '\"tag_name\"[^,}]*' | grep -oE 'v?[0-9.]+([-.][a-z0-9]+)?' | head -1";
-      }
-      {
-        name = "dolt";
-        current = "echo ${cfg.doltVersion}";
-        latest = "curl -fsSL https://api.github.com/repos/dolthub/dolt/releases/latest 2>/dev/null | grep -oE '\"tag_name\"[^,}]*' | grep -oE 'v?[0-9.]+([-.][a-z0-9]+)?' | head -1";
-      }
-    ];
+    dx.tools.updater.entries =
+      let
+        # jq is in this module's packages; GH_TOKEN lifts the 60/h
+        # unauthenticated rate limit when present.
+        latestTag = repo: ''
+          h=(); [ -n "''${GH_TOKEN:-}" ] && h=(-H "Authorization: Bearer $GH_TOKEN")
+          curl -fsSL "''${h[@]}" https://api.github.com/repos/${repo}/releases/latest 2>/dev/null | jq -r .tag_name'';
+        vpin = v: "v" + lib.removePrefix "v" v;
+      in
+      [
+        { name = "gc";   current = "echo ${vpin cfg.version}";       latest = latestTag "gastownhall/gascity"; }
+        { name = "bd";   current = "echo ${vpin cfg.beadsVersion}";  latest = latestTag "gastownhall/beads"; }
+        { name = "dolt"; current = "echo ${vpin cfg.doltVersion}";   latest = latestTag "dolthub/dolt"; }
+      ];
   };
 }

@@ -70,6 +70,7 @@
     ./modules/tools/codacy.nix
     ./modules/tools/sonar.nix
     ./modules/tools/socket.nix
+    ./modules/tools/updater.nix
 
     # --- infra: platform infrastructure ---
     ./modules/infra/openshift-compat.nix

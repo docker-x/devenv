@@ -61,5 +61,14 @@ in
         echo "dx.agents.devin: $(devin --version 2>&1 || echo 'installed')"
       fi
     '';
+
+    # Registered unconditionally: script-installed devin is updatable in
+    # place ($HOME); the binary method is store-pinned → report-only.
+    dx.tools.updater.entries = [{
+      name = "devin";
+      current = "devin --version 2>/dev/null | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
+      latest = "curl --proto =https -fsSL https://static.devin.ai/cli/current/manifest.json 2>/dev/null | grep -oE '\"version\"[^,}]*' | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
+      update = lib.optionalString (cfg.installMethod == "script") "curl --proto =https -fsSL https://cli.devin.ai/install.sh | bash";
+    }];
   };
 }

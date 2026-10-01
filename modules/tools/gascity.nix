@@ -110,17 +110,17 @@ in
       {
         name = "gc";
         current = "echo ${cfg.version}";
-        latest = "gh release view --repo gastownhall/gascity --json tagName -q .tagName 2>/dev/null";
+        latest = "curl -fsSL https://api.github.com/repos/gastownhall/gascity/releases/latest 2>/dev/null | grep -oE '\"tag_name\"[^,}]*' | grep -oE 'v?[0-9.]+([-.][a-z0-9]+)?' | head -1";
       }
       {
         name = "bd";
         current = "echo ${cfg.beadsVersion}";
-        latest = "gh release view --repo gastownhall/beads --json tagName -q .tagName 2>/dev/null";
+        latest = "curl -fsSL https://api.github.com/repos/gastownhall/beads/releases/latest 2>/dev/null | grep -oE '\"tag_name\"[^,}]*' | grep -oE 'v?[0-9.]+([-.][a-z0-9]+)?' | head -1";
       }
       {
         name = "dolt";
         current = "echo ${cfg.doltVersion}";
-        latest = "gh release view --repo dolthub/dolt --json tagName -q .tagName 2>/dev/null";
+        latest = "curl -fsSL https://api.github.com/repos/dolthub/dolt/releases/latest 2>/dev/null | grep -oE '\"tag_name\"[^,}]*' | grep -oE 'v?[0-9.]+([-.][a-z0-9]+)?' | head -1";
       }
     ];
   };

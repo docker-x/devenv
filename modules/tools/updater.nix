@@ -66,24 +66,29 @@ let
     _names=() _currents=() _latests=() _updates=()
     ${entryArrays}
 
-    _n_ok=0 _n_upd=0 _n_pin=0 _n_fail=0
+    _n_ok=0 _n_upd=0 _n_pin=0 _n_would=0 _n_fail=0
     _row() { printf '%-18s %-14s %-14s %s\n' "$1" "$2" "$3" "$4"; }
 
+    # Entry commands are build-time literals baked in by nix
+    # (escapeShellArg) — never user input — but run them via bash -c
+    # rather than eval for clarity.
     _sweep() { # name current_cmd latest_cmd update_cmd
       local name="$1" cur_cmd="$2" lat_cmd="$3" upd_cmd="$4" cur latest
-      cur=$(eval "$cur_cmd" 2>/dev/null | tail -1)
-      latest=$(eval "$lat_cmd" 2>/dev/null | tail -1)
-      [ -z "$latest" ] && latest="?"
+      cur=$(bash -c "$cur_cmd" 2>/dev/null | tail -1)
+      latest=$(bash -c "$lat_cmd" 2>/dev/null | tail -1)
       if [ -n "$cur" ] && [ "$cur" = "$latest" ]; then
         _row "$name" "$cur" "$latest" "up to date"; _n_ok=$((_n_ok+1)); return
+      fi
+      if [ -z "$latest" ] || [ "$latest" = "?" ]; then
+        _row "$name" "''${cur:-?}" "?" "latest unknown — skipped"; _n_fail=$((_n_fail+1)); return
       fi
       if [ -z "$upd_cmd" ]; then
         _row "$name" "''${cur:-?}" "$latest" "pinned — bump devenv option + rebuild"; _n_pin=$((_n_pin+1)); return
       fi
       if [ "$CHECK_ONLY" -eq 1 ]; then
-        _row "$name" "''${cur:-?}" "$latest" "would update"; _n_pin=$((_n_pin+1)); return
+        _row "$name" "''${cur:-?}" "$latest" "would update"; _n_would=$((_n_would+1)); return
       fi
-      if eval "$upd_cmd" >/dev/null 2>&1; then
+      if bash -c "$upd_cmd" >/dev/null 2>&1; then
         _row "$name" "''${cur:-?}" "$latest" "updated"; _n_upd=$((_n_upd+1))
       else
         _row "$name" "''${cur:-?}" "$latest" "FAILED"; _n_fail=$((_n_fail+1))
@@ -105,6 +110,7 @@ let
     _found=0
     if command -v npm >/dev/null 2>&1 && [ -d "$_profile/bin" ]; then
       for f in "$_profile"/bin/*; do
+        [ -e "$f" ] || continue
         spec=$(sed -n "s|.*npx --yes '\([^']*\)'.*|\1|p" "$f" 2>/dev/null | head -1)
         [ -z "$spec" ] && continue
         _found=1
@@ -127,10 +133,11 @@ let
     if command -v brew >/dev/null 2>&1; then
       echo
       echo "== homebrew =="
-      brew update >/dev/null 2>&1 || true
+      # brew update syncs taps — a mutation; skip it in report-only mode.
+      [ "$CHECK_ONLY" -eq 0 ] && { brew update >/dev/null 2>&1 || true; }
       _out=$(brew outdated 2>/dev/null || true)
       if [ -z "$_out" ]; then echo "(all brew packages current)"; _n_ok=$((_n_ok+1));
-      elif [ "$CHECK_ONLY" -eq 1 ]; then echo "$_out"; _n_pin=$((_n_pin+1));
+      elif [ "$CHECK_ONLY" -eq 1 ]; then echo "$_out"; _n_would=$((_n_would+1));
       elif brew upgrade >/dev/null 2>&1; then echo "brew: upgraded"; _n_upd=$((_n_upd+1));
       else echo "brew: upgrade FAILED"; _n_fail=$((_n_fail+1)); fi
     fi
@@ -140,14 +147,18 @@ let
         echo
         echo "== npm globals =="
         echo "$_out" | awk -F: '{print $3}' | sort -u
-        if [ "$CHECK_ONLY" -eq 0 ] && npm update -g >/dev/null 2>&1; then
+        if [ "$CHECK_ONLY" -eq 1 ]; then
+          _n_would=$((_n_would+1))
+        elif npm update -g >/dev/null 2>&1; then
           _n_upd=$((_n_upd+1)); echo "npm -g: updated"
+        else
+          _n_fail=$((_n_fail+1)); echo "npm -g: update FAILED"
         fi
       fi
     fi
 
     echo
-    printf 'summary: %d current, %d updated, %d pinned/report-only, %d failed\n' "$_n_ok" "$_n_upd" "$_n_pin" "$_n_fail"
+    printf 'summary: %d current, %d updated, %d would-update, %d pinned, %d failed\n' "$_n_ok" "$_n_upd" "$_n_would" "$_n_pin" "$_n_fail"
     [ "$_n_fail" -eq 0 ]
   '';
 in

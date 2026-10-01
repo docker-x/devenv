@@ -88,7 +88,7 @@ let
       if [ "$CHECK_ONLY" -eq 1 ]; then
         _row "$name" "''${cur:-?}" "$latest" "would update"; _n_would=$((_n_would+1)); return
       fi
-      if bash -c "$upd_cmd" >/dev/null 2>&1; then
+      if bash -o pipefail -c "$upd_cmd" >/dev/null 2>&1; then
         _row "$name" "''${cur:-?}" "$latest" "updated"; _n_upd=$((_n_upd+1))
       else
         _row "$name" "''${cur:-?}" "$latest" "FAILED"; _n_fail=$((_n_fail+1))
@@ -114,8 +114,12 @@ let
         spec=$(sed -n "s|.*npx --yes '\([^']*\)'.*|\1|p" "$f" 2>/dev/null | head -1)
         [ -z "$spec" ] && continue
         _found=1
-        pkg="''${spec%@*}"; ver="''${spec##*@}"
-        [ "$pkg" = "$spec" ] && { pkg="$spec"; ver="latest"; }
+        case "$spec" in
+          @*@*) pkg="''${spec%@*}"; ver="''${spec##*@}" ;;   # @scope/pkg@ver
+          @*)   pkg="$spec";            ver="latest" ;;      # @scope/pkg
+          *@*)  pkg="''${spec%@*}"; ver="''${spec##*@}" ;;   # pkg@ver
+          *)    pkg="$spec";            ver="latest" ;;      # pkg
+        esac
         name=$(basename "$f")
         if [ "$ver" = "latest" ]; then
           # Wrapper always resolves the latest tag — never invoke the tool

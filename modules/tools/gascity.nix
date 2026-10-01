@@ -26,8 +26,8 @@ let
       aarch64-linux = "6620ef51c8ba620821e5ef8b208bb1b3de090fa86ec5e0327da1edd615407e29";
     };
     beads = {
-      x86_64-linux = "8140098a51d3b81d5548d1c5e6db1a2d9930e5d141efe2a4bff7d079c4d321e8";
-      aarch64-linux = "501f38a1070d4b9b3b6261a86a3c92c4a52366869021560430a4bb0036afd83a";
+      x86_64-linux = "3219443a9734b89b93fb16ee8d65844759fa1b3cd3cf139c606b7353cfb0715c";
+      aarch64-linux = "c3b32c71a6c0cd6358a12c28272b17e6818db991da192f87df52339c222e423a";
     };
     dolt = {
       x86_64-linux = "4acd730a4c53991996854a72fbb1add102b0a583bd07411320efb65037a43d9d";
@@ -47,7 +47,7 @@ in
 
     beadsVersion = lib.mkOption {
       type = lib.types.str;
-      default = "v1.2.2";
+      default = "v1.3.1";
       description = "Beads (bd) release tag from gastownhall/beads. Pinned because sha256 is verified.";
     };
 

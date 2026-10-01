@@ -7,7 +7,7 @@
 #     ("pinned X, latest Y") and points at the real update path
 #     (bump the option / `devenv update` + rebuild).
 #   * Runtime-installed tools — script installers (devin), npx `latest`
-#     wrappers, npm/bun globals, Homebrew — updatable in place.
+#     wrappers, npm globals, Homebrew — updatable in place.
 #
 # Other modules register per-tool entries:
 #
@@ -139,25 +139,35 @@ let
       echo "== homebrew =="
       # brew update syncs taps — a mutation; skip it in report-only mode.
       [ "$CHECK_ONLY" -eq 0 ] && { brew update >/dev/null 2>&1 || true; }
-      _out=$(brew outdated 2>/dev/null || true)
-      if [ -z "$_out" ]; then echo "(all brew packages current)"; _n_ok=$((_n_ok+1));
-      elif [ "$CHECK_ONLY" -eq 1 ]; then echo "$_out"; _n_would=$((_n_would+1));
-      elif brew upgrade >/dev/null 2>&1; then echo "brew: upgraded"; _n_upd=$((_n_upd+1));
-      else echo "brew: upgrade FAILED"; _n_fail=$((_n_fail+1)); fi
+      if _out=$(brew outdated 2>/dev/null); then
+        if [ -z "$_out" ]; then echo "(all brew packages current)"; _n_ok=$((_n_ok+1));
+        elif [ "$CHECK_ONLY" -eq 1 ]; then echo "$_out"; _n_would=$((_n_would+1));
+        elif brew upgrade >/dev/null 2>&1; then echo "brew: upgraded"; _n_upd=$((_n_upd+1));
+        else echo "brew: upgrade FAILED"; _n_fail=$((_n_fail+1)); fi
+      else
+        echo "brew outdated query FAILED"; _n_fail=$((_n_fail+1))
+      fi
     fi
     if command -v npm >/dev/null 2>&1; then
-      _out=$(npm outdated -g --parseable 2>/dev/null || true)
-      if [ -n "$_out" ]; then
-        echo
-        echo "== npm globals =="
-        echo "$_out" | awk -F: '{print $3}' | sort -u
-        if [ "$CHECK_ONLY" -eq 1 ]; then
-          _n_would=$((_n_would+1))
-        elif npm update -g >/dev/null 2>&1; then
-          _n_upd=$((_n_upd+1)); echo "npm -g: updated"
-        else
-          _n_fail=$((_n_fail+1)); echo "npm -g: update FAILED"
+      # npm outdated exits 1 when outdated packages exist — that is data,
+      # not failure. Anything >1 is a real probe error.
+      _out=$(npm outdated -g --parseable 2>/dev/null); _rc=$?
+      if [ "$_rc" -le 1 ]; then
+        if [ -n "$_out" ]; then
+          echo
+          echo "== npm globals =="
+          # parseable format: location:name@current:name@wanted:name@latest:type
+          echo "$_out" | awk -F: '{print $2" -> "$4}' | sort -u
+          if [ "$CHECK_ONLY" -eq 1 ]; then
+            _n_would=$((_n_would+1))
+          elif npm update -g >/dev/null 2>&1; then
+            _n_upd=$((_n_upd+1)); echo "npm -g: updated"
+          else
+            _n_fail=$((_n_fail+1)); echo "npm -g: update FAILED"
+          fi
         fi
+      else
+        echo "npm outdated -g query FAILED"; _n_fail=$((_n_fail+1))
       fi
     fi
 

@@ -62,13 +62,13 @@ in
       fi
     '';
 
-    # Script-installed devin lives in $HOME — updatable in place by
-    # rerunning the same installer the enterShell hook uses.
-    dx.tools.updater.entries = lib.optional (cfg.installMethod == "script") {
+    # Registered unconditionally: script-installed devin is updatable in
+    # place ($HOME); the binary method is store-pinned → report-only.
+    dx.tools.updater.entries = [{
       name = "devin";
       current = "devin --version 2>/dev/null | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
       latest = "curl --proto =https -fsSL https://static.devin.ai/cli/api/cli/update 2>/dev/null | grep -oE '\"version\"[^,}]*' | grep -oE '[0-9]+(\\.[0-9]+)+' | head -1";
-      update = "curl --proto =https -fsSL https://cli.devin.ai/install.sh | bash";
-    };
+      update = lib.optionalString (cfg.installMethod == "script") "curl --proto =https -fsSL https://cli.devin.ai/install.sh | bash";
+    }];
   };
 }

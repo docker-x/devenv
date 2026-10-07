@@ -261,6 +261,11 @@ WRAPPER
             _dest="$_AGENT_DIR/$_base"
             if [[ -e "$_dest" ]] || [[ -L "$_dest" ]]; then
               _dest="$_AGENT_DIR/$_base-legacy"
+              _n=0
+              while [[ -e "$_dest" ]] || [[ -L "$_dest" ]]; do
+                _n=$((_n + 1))
+                _dest="$_AGENT_DIR/$_base-legacy.$_n"
+              done
             fi
             mv "$_item" "$_dest" 2>/dev/null || true
           done

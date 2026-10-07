@@ -62,7 +62,7 @@ devenv shell
 | ------ | ----------- | ------------- |
 | `agentConfig` | Shared `AGENT_CONFIG_DIR` for AI agent config | `agent-config` |
 
-### `dx.agents.*` — AI coding agents (24)
+### `dx.agents.*` — AI coding agents (25)
 
 | Module | Description | Native devenv? |
 | ------ | ----------- | -------------- |
@@ -82,6 +82,7 @@ devenv shell
 | `kimi` | Kimi Code (Moonshot AI) | — |
 | `qwenCode` | Qwen Code (Alibaba) | — |
 | `opencode` | OpenCode AI | — |
+| `pi` | Pi coding agent | — |
 | `openclaw` | OpenClaw | — |
 | `cao` | CLI Agent Orchestrator (AWS Labs) | — |
 | `herdr` | Herdr | — |

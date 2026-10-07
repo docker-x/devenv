@@ -250,7 +250,24 @@ WRAPPER
       fi
     '' + lib.concatMapStringsSep "\n" (path: ''
       if [[ ! -L "${path}" ]]; then
-        if [[ -e "${path}" ]] && [[ ! -L "${path}" ]]; then
+        if [[ -d "${path}" ]] && [[ ! -L "${path}" ]]; then
+          # Adopt existing config into the shared dir instead of orphaning it
+          # at <name>-legacy: the agent keeps reading documented paths (e.g.
+          # ~/.pi/agent/auth.json) through the symlink. Conflicting entries
+          # are kept as <name>-legacy backups — never overwritten.
+          for _item in "${path}"/* "${path}"/.[!.]* "${path}"/..?*; do
+            [[ -e "$_item" ]] || [[ -L "$_item" ]] || continue
+            _base="$(basename "$_item")"
+            _dest="$_AGENT_DIR/$_base"
+            if [[ -e "$_dest" ]] || [[ -L "$_dest" ]]; then
+              _dest="$_AGENT_DIR/$_base-legacy"
+            fi
+            mv "$_item" "$_dest" 2>/dev/null || true
+          done
+          # Empty husk -> rmdir; leftovers (failed moves) -> legacy backup.
+          rmdir "${path}" 2>/dev/null \
+            || mv "${path}" "$_AGENT_DIR/$(basename "${path}")-legacy" 2>/dev/null || true
+        elif [[ -e "${path}" ]] && [[ ! -L "${path}" ]]; then
           mv "${path}" "$_AGENT_DIR/$(basename "${path}")-legacy" 2>/dev/null || true
         fi
         mkdir -p "$(dirname "${path}")"

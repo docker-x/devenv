@@ -24,6 +24,7 @@ let
     goose = ".config/goose/skills";
     windsurf = ".codeium/windsurf/skills";
     kilo = ".kilocode/skills";
+    pi = ".pi/agent/skills";
   };
 in
 {

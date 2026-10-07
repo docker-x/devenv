@@ -46,6 +46,7 @@
     ./modules/agents/kimi.nix
     ./modules/agents/qwen-code.nix
     ./modules/agents/opencode.nix
+    ./modules/agents/pi.nix
     ./modules/agents/openclaw.nix
     ./modules/agents/cao.nix
     ./modules/agents/herdr.nix

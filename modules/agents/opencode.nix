@@ -39,9 +39,7 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable (assert lib.assertMsg
-    (cfg.installMethod != "binary" || cfg.version != "latest")
-    "dx.agents.opencode: installMethod \"binary\" requires a pinned version (npm registry has no 'latest' tarball URL)"; {
+  config = lib.mkIf cfg.enable {
     dx.core.agentConfig.enable = lib.mkIf cfg.shareConfig true;
 
     packages = lib.optional (cfg.installMethod == "npm")
@@ -54,7 +52,9 @@ in
       (helpers.mkGithubBinary {
         pname = "opencode";
         version = cfg.version;
-        url = "https://registry.npmjs.org/${npmPkg}/-/${npmPkg}-${cfg.version}.tgz";
+        url = if cfg.version == "latest"
+          then throw "dx.agents.opencode: installMethod \"binary\" requires a pinned version (npm registry has no 'latest' tarball URL)"
+          else "https://registry.npmjs.org/${npmPkg}/-/${npmPkg}-${cfg.version}.tgz";
         asset = "${npmPkg}-${cfg.version}.tgz";
         sha256 = hashes.${cfg.version}.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
         # The bundled binary is a dynamically-linked ELF pointing at the
@@ -67,5 +67,5 @@ in
       configPaths = [ "$HOME/.opencode" "$HOME/.config/opencode" ];
       agentConfigDir = toString agentConfigDir;
     });
-  });
+  };
 }

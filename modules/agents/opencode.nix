@@ -33,8 +33,17 @@ in
     extraOptions = {
       installMethod = lib.mkOption {
         type = lib.types.enum [ "npm" "binary" ];
-        default = "npm";
-        description = "Install OpenCode via npm or a direct binary download.";
+        # Binary is the default: the npm path's postinstall cannot exec the
+        # bundled ELF in Nix containers (no /lib64/ld-linux) and fails
+        # silently in verifyBinary() — the npm tarball path runs the same
+        # binary through the nix dynamic loader.
+        default = "binary";
+        description = "Install OpenCode via npm (npx wrapper) or the platform binary tarball.";
+      };
+      version = lib.mkOption {
+        type = lib.types.str;
+        default = "1.18.32";
+        description = "OpenCode version. Pinned by default because the binary method verifies sha256 — bump hashes when bumping the version; 'latest' is valid only with installMethod = \"npm\".";
       };
     };
   };

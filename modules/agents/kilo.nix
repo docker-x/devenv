@@ -49,6 +49,11 @@ in
         repo = "kilo";
         asset = "kilo-linux-${archSuffix}.tar.gz";
         sha256 = hashes.${cfg.version}.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
+        # The release binary is dynamically linked against the host
+        # /lib64/ld-linux, which doesn't exist in the container — wrap it
+        # through the nix dynamic loader instead of patchelfing (Go/bundled
+        # binaries can break when their ELF headers are rewritten).
+        ldsoWrapper = true;
       })
     ];
   };

@@ -23,9 +23,12 @@ let
   mkGithubBinary =
     { pname
     , version
-    , owner
+    , owner ? null
     , repo ? owner
     , asset
+    , # Override the constructed GitHub release URL — for packages whose
+      # release artifacts live elsewhere (e.g. npm platform tarballs).
+      url ? null
     , sha256 ? lib.fakeHash
     , postInstall ? ""
     , # Set true for dynamically-linked binaries (e.g. CGO-enabled Go
@@ -58,6 +61,11 @@ let
     pkgs.stdenv.mkDerivation {
       inherit pname version;
 
+      # Fetched blobs are already-built upstream binaries — stripping
+      # provides no benefit and corrupts self-appended payloads (e.g.
+      # bun-compiled binaries like opencode lose their bundled code).
+      dontStrip = true;
+
       postInstall = postInstall + lib.optionalString autoPatchelf ''
         patchelf --set-interpreter "${ldso}" \
           --set-rpath "${lib.makeLibraryPath [ pkgs.stdenv.cc.libc pkgs.stdenv.cc.cc.lib ]}" \
@@ -73,7 +81,9 @@ WRAPPER
       '';
 
       src = pkgs.fetchurl {
-        url = "https://github.com/${owner}/${repo}/releases/${versionPath}/${asset}";
+        url =
+          if url != null then url
+          else "https://github.com/${owner}/${repo}/releases/${versionPath}/${asset}";
         inherit sha256;
       };
 

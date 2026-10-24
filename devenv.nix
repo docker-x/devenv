@@ -56,6 +56,7 @@
     ./modules/agents/letta.nix
     ./modules/agents/auggie.nix
     ./modules/agents/omp.nix
+    ./modules/agents/codewhale.nix
     ./modules/agents/docker-agent.nix
     ./modules/agents/agent-skills.nix
 

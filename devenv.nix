@@ -53,6 +53,9 @@
     ./modules/agents/hermes.nix
     ./modules/agents/mastra-code.nix
     ./modules/agents/grok-build.nix
+    ./modules/agents/letta.nix
+    ./modules/agents/auggie.nix
+    ./modules/agents/omp.nix
     ./modules/agents/docker-agent.nix
     ./modules/agents/agent-skills.nix
 

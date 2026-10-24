@@ -150,14 +150,16 @@ let
     fi
     if command -v npm >/dev/null 2>&1; then
       # npm outdated exits 1 when outdated packages exist — that is data,
-      # not failure. Anything >1 is a real probe error.
+      # not failure. But exit 1 also covers command errors (registry/auth
+      # failures print to stderr and leave stdout empty) — accept it only
+      # with actual package data; anything >1 is a real probe error.
       _out=$(npm outdated -g --parseable 2>/dev/null); _rc=$?
-      if [ "$_rc" -le 1 ]; then
+      if [ "$_rc" -eq 0 ] || { [ "$_rc" -eq 1 ] && [ -n "$_out" ]; }; then
         if [ -n "$_out" ]; then
           echo
           echo "== npm globals =="
-          # parseable format: location:name@current:name@wanted:name@latest:type
-          echo "$_out" | awk -F: '{print $2" -> "$4}' | sort -u
+          # parseable format: location:name@wanted:name@current:name@latest:dependent
+          echo "$_out" | awk -F: '{print $3" -> "$4}' | sort -u
           if [ "$CHECK_ONLY" -eq 1 ]; then
             _n_would=$((_n_would+1))
           elif npm update -g >/dev/null 2>&1; then

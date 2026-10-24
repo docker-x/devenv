@@ -30,6 +30,13 @@ in
   options.dx.agents.codewhale = helpers.mkAgentOptions {
     agentId = "codewhale";
     name = "Codewhale";
+    extraOptions = {
+      version = lib.mkOption {
+        type = lib.types.str;
+        default = "0.10.1";
+        description = "Codewhale version. Pinned by default because the binary method verifies sha256 — bump hashes when bumping the version; 'latest' is not supported (release assets have no 'latest' URL).";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {

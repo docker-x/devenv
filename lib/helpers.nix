@@ -42,9 +42,19 @@ let
       # binary untouched in libexec/ and installs a bin/ wrapper that
       # execs it through the nix dynamic loader.
       ldsoWrapper ? false
+    , # Third mode for self-locating binaries (bun single-executable
+      # applications): ldsoWrapper breaks them because /proc/self/exe
+      # resolves to the linker, not the app, so the embedded bundle is
+      # never found; autoPatchelf's --set-rpath relocates headers the
+      # runtime re-reads and segfaults. Setting ONLY the interpreter
+      # leaves the rest of the ELF untouched — binary stays the real
+      # /proc/self/exe and starts fine without extra rpath.
+      interpOnly ? false
     }:
     assert lib.assertMsg (!(autoPatchelf && ldsoWrapper))
       "mkGithubBinary ${pname}: autoPatchelf and ldsoWrapper are mutually exclusive — patchelfing before wrapping defeats the wrapper's purpose";
+    assert lib.assertMsg (!(interpOnly && (autoPatchelf || ldsoWrapper)))
+      "mkGithubBinary ${pname}: interpOnly is mutually exclusive with autoPatchelf and ldsoWrapper";
     let
       # GitHub release URL format:
       #   Pinned:  /releases/download/${version}/${asset}
@@ -78,6 +88,8 @@ let
 exec "${ldso}" --library-path "${lib.makeLibraryPath [ pkgs.stdenv.cc.libc pkgs.stdenv.cc.cc.lib ]}" "$out/libexec/${pname}" "\$@"
 WRAPPER
         chmod +x "$out/bin/${pname}"
+      '' + lib.optionalString interpOnly ''
+        patchelf --set-interpreter "${ldso}" "$out/bin/${pname}"
       '';
 
       src = pkgs.fetchurl {
@@ -93,7 +105,7 @@ WRAPPER
 
       # tar/gzip/xz come from stdenv; only .zip archives need unzip.
       nativeBuildInputs = lib.optional isZip pkgs.unzip
-        ++ lib.optional autoPatchelf pkgs.patchelf;
+        ++ lib.optional (autoPatchelf || interpOnly) pkgs.patchelf;
 
       installPhase = ''
         runHook preInstall

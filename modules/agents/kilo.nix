@@ -49,11 +49,12 @@ in
         repo = "kilo";
         asset = "kilo-linux-${archSuffix}.tar.gz";
         sha256 = hashes.${cfg.version}.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
-        # The release binary is dynamically linked against the host
-        # /lib64/ld-linux, which doesn't exist in the container — wrap it
-        # through the nix dynamic loader instead of patchelfing (Go/bundled
-        # binaries can break when their ELF headers are rewritten).
-        ldsoWrapper = true;
+        # Kilo is a bun single-executable: ldsoWrapper breaks it (the SEA
+        # locates its embedded bundle via /proc/self/exe, which resolves to
+        # the linker under ld.so → falls back to bare-bun help), and
+        # autoPatchelf's --set-rpath relocates headers the runtime re-reads
+        # (segfault). Interpreter-only patchelf keeps /proc/self/exe intact.
+        interpOnly = true;
       })
     ];
   };

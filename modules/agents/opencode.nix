@@ -12,10 +12,15 @@ let
   # npm ships the real binary as platform optional-deps tarballs
   # (opencode-linux-x64 etc.) — the GitHub releases repo's asset scheme
   # went stale, so the binary install path fetches the npm tarball.
-  npmPkg = {
+  # OpenCode 2.x moved the npm packages under the @opencode org
+  npmPkg = if lib.versionAtLeast cfg.version "2.0.0" then {
+    x86_64-linux = "@opencode/cli-linux-x64";
+    aarch64-linux = "@opencode/cli-linux-arm64";
+  } else {
     x86_64-linux = "opencode-linux-x64";
     aarch64-linux = "opencode-linux-arm64";
-  }.${pkgs.stdenv.hostPlatform.system} or (throw "dx.agents.opencode: unsupported system ${pkgs.stdenv.hostPlatform.system}");
+  };
+  npmPkgName = npmPkg.${pkgs.stdenv.hostPlatform.system} or (throw "dx.agents.opencode: unsupported system ${pkgs.stdenv.hostPlatform.system}");
 
   # sha256 of the npm platform tarballs, keyed by version — same
   # fill-in-the-hash flow as dx.agents.kilo on version bumps.
@@ -23,6 +28,10 @@ let
     "1.18.32" = {
       x86_64-linux = "sha256-2ggDyF64ZwnE8ISty/sLUymTZnC/5D0jZ/DKA0vgwd4=";
       aarch64-linux = "sha256-KastYacOmdEiTSiRFcO4GU/yVJaOJglTEYYie+ObIAE=";
+    };
+    "2.1.4" = {
+      x86_64-linux = "sha256-zgWr4tzhBBORyOyM242gZvZA/UcecqyEbcsInEQeEeE=";
+      aarch64-linux = "sha256-6ay04jqaxDITlpOqFmRVpq3YlGUzOUy+CDRZpI54iGE=";
     };
   };
 in
@@ -42,7 +51,7 @@ in
       };
       version = lib.mkOption {
         type = lib.types.str;
-        default = "1.18.32";
+        default = "2.1.4";
         description = "OpenCode version. Pinned by default because the binary method verifies sha256 — bump hashes when bumping the version; 'latest' is valid only with installMethod = \"npm\".";
       };
     };
@@ -63,12 +72,17 @@ in
         version = cfg.version;
         url = if cfg.version == "latest"
           then throw "dx.agents.opencode: installMethod \"binary\" requires a pinned version (npm registry has no 'latest' tarball URL)"
-          else "https://registry.npmjs.org/${npmPkg}/-/${npmPkg}-${cfg.version}.tgz";
-        asset = "${npmPkg}-${cfg.version}.tgz";
+          else "https://registry.npmjs.org/${npmPkgName}/-/${lib.last (lib.splitString "/" npmPkgName)}-${cfg.version}.tgz";
+        asset = "${lib.last (lib.splitString "/" npmPkgName)}-${cfg.version}.tgz";
         sha256 = hashes.${cfg.version}.${pkgs.stdenv.hostPlatform.system} or lib.fakeHash;
-        # The bundled binary is a dynamically-linked ELF pointing at the
-        # host /lib64/ld-linux — wrap it through the nix dynamic loader.
-        ldsoWrapper = true;
+        # OpenCode is a bun single-executable: ldsoWrapper execs via ld.so
+        # so /proc/self/exe resolves to the linker — the SEA still loads
+        # (opencode serve works) but self-locating features break (e.g.
+        # `opencode upgrade` detects the install dir as the ldso path and
+        # reports "unknown installation method"). autoPatchelf --set-rpath
+        # relocates headers the runtime re-reads → segfault. interpOnly
+        # keeps /proc/self/exe pointing at the real binary.
+        interpOnly = true;
       });
 
     enterShell = lib.optionalString cfg.shareConfig (helpers.shareConfigHook {
